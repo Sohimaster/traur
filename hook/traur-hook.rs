@@ -3,8 +3,8 @@
 //! filters to AUR-only packages, scans each using the traur library directly,
 //! shows all results, and prompts the user before continuing.
 //!
-//! All output goes to stderr — pacman buffers hook stdout, causing interleaving
-//! with /dev/tty prompt. stderr is unbuffered and goes directly to the terminal.
+//! All output goes to /dev/tty — pacman buffers both stdout and stderr from
+//! hooks, so we must write directly to the terminal.
 
 use std::fs::OpenOptions;
 use std::io::{self, BufRead, BufReader, Write};
@@ -14,23 +14,6 @@ use traur::coordinator;
 use traur::shared::config::{self, is_whitelisted_in};
 use traur::shared::output;
 use traur::shared::scoring::Tier;
-
-fn print_logo() {
-    eprintln!(
-        "{}",
-        r#"
-  ╔╦╗╦═╗╔═╗╦ ╦╦═╗
-   ║ ╠╦╝╠═╣║ ║╠╦╝
-   ╩ ╩╚═╩ ╩╚═╝╩╚═"#
-            .red()
-            .bold()
-    );
-    eprintln!(
-        "  {}",
-        "AUR Package Security Scanner".dimmed()
-    );
-    eprintln!();
-}
 
 fn main() {
     // Force colored output — ALPM hooks inherit the terminal but colored
@@ -61,15 +44,33 @@ fn main() {
         return;
     }
 
+    // Open /dev/tty for ALL output — pacman buffers both stdout and stderr
+    // from hooks, so only direct tty writes appear immediately.
+    let mut tty = match OpenOptions::new().read(true).write(true).open("/dev/tty") {
+        Ok(f) => f,
+        Err(_) => return, // non-interactive, skip silently
+    };
+
     let config = config::load_config();
     let mut has_critical = false;
     let mut any_scanned = false;
 
-    print_logo();
+    let _ = writeln!(
+        tty,
+        "{}",
+        r#"
+  ╔╦╗╦═╗╔═╗╦ ╦╦═╗
+   ║ ╠╦╝╠═╣║ ║╠╦╝
+   ╩ ╩╚═╩ ╩╚═╝╩╚═"#
+            .red()
+            .bold()
+    );
+    let _ = writeln!(tty, "  {}", "AUR Package Security Scanner".dimmed());
+    let _ = writeln!(tty);
 
     for pkg in &aur_packages {
         if is_whitelisted_in(&config, pkg) {
-            eprintln!("traur: {pkg} (whitelisted, skipping scan)");
+            let _ = writeln!(tty, "traur: {pkg} (whitelisted, skipping scan)");
             continue;
         }
 
@@ -78,13 +79,13 @@ fn main() {
         match coordinator::build_context(pkg) {
             Ok(ctx) => {
                 let result = coordinator::run_analysis(&ctx);
-                output::print_text(&result, false);
+                output::write_text(&mut tty, &result, false);
                 if result.tier >= Tier::Critical {
                     has_critical = true;
                 }
             }
             Err(e) => {
-                eprintln!("traur: failed to scan '{pkg}': {e}");
+                let _ = writeln!(tty, "traur: failed to scan '{pkg}': {e}");
                 // Fail open on scan errors
             }
         }
@@ -95,51 +96,38 @@ fn main() {
     }
 
     if has_critical {
-        eprintln!();
-        eprintln!(
+        let _ = writeln!(tty);
+        let _ = writeln!(
+            tty,
             "{}",
             "traur: CRITICAL/MALICIOUS packages detected above".red().bold()
         );
-        eprintln!("traur: use 'traur allow <package>' to whitelist, then retry");
+        let _ = writeln!(
+            tty,
+            "traur: use 'traur allow <package>' to whitelist, then retry"
+        );
         std::process::exit(1);
     }
 
-    // Prompt via /dev/tty — stdin is consumed by ALPM's NeedsTargets pipe,
-    // so we open /dev/tty read-write and use it for both prompt and response.
-    let response = prompt_tty(&format!(
-        "\n{} ",
-        "traur: Continue with installation? [y/N]".bold()
-    ));
-    match response.trim().to_lowercase().as_str() {
+    // Prompt and read response via the same /dev/tty fd
+    let _ = writeln!(tty);
+    let _ = write!(tty, "{} ", "traur: Continue with installation? [y/N]".bold());
+    let _ = tty.flush();
+
+    let mut reader = BufReader::new(tty);
+    let mut line = String::new();
+    let response = match reader.read_line(&mut line) {
+        Ok(0) => "",
+        Ok(_) => line.trim(),
+        Err(_) => "",
+    };
+
+    match response.to_lowercase().as_str() {
         "y" | "yes" => {} // proceed
         _ => {
             eprintln!("traur: aborting transaction");
             std::process::exit(1);
         }
-    }
-}
-
-/// Write prompt to /dev/tty and read response from it.
-/// Using /dev/tty directly bypasses stdin (which ALPM uses for targets).
-fn prompt_tty(prompt: &str) -> String {
-    let mut tty = match OpenOptions::new().read(true).write(true).open("/dev/tty") {
-        Ok(f) => f,
-        Err(e) => {
-            eprintln!("traur: cannot open /dev/tty: {e}");
-            eprintln!("traur: aborting (non-interactive)");
-            std::process::exit(1);
-        }
-    };
-
-    let _ = tty.write_all(prompt.as_bytes());
-    let _ = tty.flush();
-
-    let mut reader = BufReader::new(tty);
-    let mut line = String::new();
-    match reader.read_line(&mut line) {
-        Ok(0) => String::new(),
-        Ok(_) => line,
-        Err(_) => String::new(),
     }
 }
 
