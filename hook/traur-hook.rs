@@ -66,7 +66,7 @@ fn main() {
             .red()
             .bold()
     );
-    let _ = writeln!(tty, "  {}", "Pre-install trust scoring for AUR packages".dimmed());
+    let _ = writeln!(tty, "  {}", "Trust scoring for AUR packages".dimmed());
     let _ = writeln!(tty);
 
     for pkg in &aur_packages {

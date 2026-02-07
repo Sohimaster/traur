@@ -7,7 +7,7 @@ use clap::{Parser, Subcommand};
 use std::process;
 
 #[derive(Parser)]
-#[command(name = "traur", about = "Pre-install trust scoring for AUR packages")]
+#[command(name = "traur", about = "Trust scoring for AUR packages")]
 struct Cli {
     #[command(subcommand)]
     command: Commands,
