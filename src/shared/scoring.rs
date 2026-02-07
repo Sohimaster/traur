@@ -21,13 +21,13 @@ pub enum SignalCategory {
     Temporal,
 }
 
-/// Risk tier derived from the final score.
+/// Trust tier derived from the final score.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize)]
 pub enum Tier {
-    Low,
-    Medium,
-    High,
-    Critical,
+    Trusted,
+    Ok,
+    Sketchy,
+    Suspicious,
     Malicious,
 }
 
@@ -59,21 +59,22 @@ pub fn compute_score(package_name: &str, signals: &[Signal]) -> ScanResult {
 
     if let Some(signal) = best_override {
         // Use the higher of the override gate score and the weighted score
-        let score = signal.points.max(weighted_score).min(100);
+        let risk = signal.points.max(weighted_score).min(100);
         return ScanResult {
             package: package_name.to_string(),
-            score,
+            score: 100 - risk,
             tier: Tier::Malicious,
             signals: signals.to_vec(),
             override_gate_fired: Some(signal.id.clone()),
         };
     }
 
-    let tier = score_to_tier(weighted_score);
+    let trust = 100 - weighted_score;
+    let tier = score_to_tier(trust);
 
     ScanResult {
         package: package_name.to_string(),
-        score: weighted_score,
+        score: trust,
         tier,
         signals: signals.to_vec(),
         override_gate_fired: None,
@@ -109,23 +110,23 @@ fn compute_weighted(signals: &[Signal]) -> u32 {
     (weighted.round() as u32).min(100)
 }
 
-fn score_to_tier(score: u32) -> Tier {
-    match score {
-        0..=19 => Tier::Low,
-        20..=39 => Tier::Medium,
-        40..=59 => Tier::High,
-        60..=79 => Tier::Critical,
-        _ => Tier::Malicious,
+fn score_to_tier(trust: u32) -> Tier {
+    match trust {
+        0..=20 => Tier::Malicious,
+        21..=40 => Tier::Suspicious,
+        41..=60 => Tier::Sketchy,
+        61..=80 => Tier::Ok,
+        _ => Tier::Trusted,
     }
 }
 
 impl std::fmt::Display for Tier {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Tier::Low => write!(f, "LOW"),
-            Tier::Medium => write!(f, "MEDIUM"),
-            Tier::High => write!(f, "HIGH"),
-            Tier::Critical => write!(f, "CRITICAL"),
+            Tier::Trusted => write!(f, "TRUSTED"),
+            Tier::Ok => write!(f, "OK"),
+            Tier::Sketchy => write!(f, "SKETCHY"),
+            Tier::Suspicious => write!(f, "SUSPICIOUS"),
             Tier::Malicious => write!(f, "MALICIOUS"),
         }
     }
@@ -147,10 +148,10 @@ mod tests {
     }
 
     #[test]
-    fn no_signals_scores_zero() {
+    fn no_signals_scores_full_trust() {
         let result = compute_score("pkg", &[]);
-        assert_eq!(result.score, 0);
-        assert_eq!(result.tier, Tier::Low);
+        assert_eq!(result.score, 100);
+        assert_eq!(result.tier, Tier::Trusted);
         assert!(result.override_gate_fired.is_none());
     }
 
@@ -163,7 +164,7 @@ mod tests {
         let result = compute_score("pkg", &signals);
         assert_eq!(result.tier, Tier::Malicious);
         assert_eq!(result.override_gate_fired.as_deref(), Some("P-REVSHELL-DEVTCP"));
-        assert!(result.score >= 95);
+        assert!(result.score <= 5, "Trust {} should be <= 5", result.score);
     }
 
     #[test]
@@ -178,9 +179,9 @@ mod tests {
         ];
         let result = compute_score("pkg", &signals);
         assert_eq!(result.tier, Tier::Malicious);
-        // Weighted: 0.45*100 + 0.25*65 + 0.15*30 + 0.15*55 = 45+16.25+4.5+8.25 = 74
-        // Override gate: 85. Max(85, 74) = 85
-        assert!(result.score >= 85, "Score {} should be >= 85", result.score);
+        // Weighted risk: 0.45*100 + 0.25*65 + 0.15*30 + 0.15*55 = 74
+        // Override gate risk: 85. Max(85, 74) = 85. Trust = 100 - 85 = 15
+        assert!(result.score <= 15, "Trust {} should be <= 15", result.score);
     }
 
     #[test]
@@ -190,27 +191,27 @@ mod tests {
             signal("P-B", SignalCategory::Pkgbuild, 80, false),
         ];
         let result = compute_score("pkg", &signals);
-        // Pkgbuild: min(160, 100) = 100 -> 0.45 * 100 = 45
-        assert_eq!(result.score, 45);
-        assert_eq!(result.tier, Tier::High);
+        // Pkgbuild: min(160, 100) = 100 -> 0.45 * 100 = 45 risk -> 55 trust
+        assert_eq!(result.score, 55);
+        assert_eq!(result.tier, Tier::Sketchy);
     }
 
     #[test]
     fn tier_boundaries() {
-        assert_eq!(score_to_tier(0), Tier::Low);
-        assert_eq!(score_to_tier(19), Tier::Low);
-        assert_eq!(score_to_tier(20), Tier::Medium);
-        assert_eq!(score_to_tier(39), Tier::Medium);
-        assert_eq!(score_to_tier(40), Tier::High);
-        assert_eq!(score_to_tier(59), Tier::High);
-        assert_eq!(score_to_tier(60), Tier::Critical);
-        assert_eq!(score_to_tier(79), Tier::Critical);
-        assert_eq!(score_to_tier(80), Tier::Malicious);
-        assert_eq!(score_to_tier(100), Tier::Malicious);
+        assert_eq!(score_to_tier(0), Tier::Malicious);
+        assert_eq!(score_to_tier(20), Tier::Malicious);
+        assert_eq!(score_to_tier(21), Tier::Suspicious);
+        assert_eq!(score_to_tier(40), Tier::Suspicious);
+        assert_eq!(score_to_tier(41), Tier::Sketchy);
+        assert_eq!(score_to_tier(60), Tier::Sketchy);
+        assert_eq!(score_to_tier(61), Tier::Ok);
+        assert_eq!(score_to_tier(80), Tier::Ok);
+        assert_eq!(score_to_tier(81), Tier::Trusted);
+        assert_eq!(score_to_tier(100), Tier::Trusted);
     }
 
     #[test]
-    fn max_score_is_100() {
+    fn min_trust_is_zero() {
         let signals = vec![
             signal("P", SignalCategory::Pkgbuild, 200, false),
             signal("M", SignalCategory::Metadata, 200, false),
@@ -218,6 +219,6 @@ mod tests {
             signal("T", SignalCategory::Temporal, 200, false),
         ];
         let result = compute_score("pkg", &signals);
-        assert_eq!(result.score, 100);
+        assert_eq!(result.score, 0);
     }
 }

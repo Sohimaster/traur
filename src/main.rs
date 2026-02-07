@@ -7,7 +7,7 @@ use clap::{Parser, Subcommand};
 use std::process;
 
 #[derive(Parser)]
-#[command(name = "traur", about = "Heuristic security scanner for AUR packages")]
+#[command(name = "traur", about = "Pre-install trust scoring for AUR packages")]
 struct Cli {
     #[command(subcommand)]
     command: Commands,
@@ -123,7 +123,7 @@ fn cmd_scan(
         } else {
             shared::output::print_text(&result, verbose);
         }
-        return if result.tier >= shared::scoring::Tier::Critical { 1 } else { 0 };
+        return if result.tier >= shared::scoring::Tier::Suspicious { 1 } else { 0 };
     }
 
     if let Some(pkg) = package {
@@ -139,8 +139,8 @@ fn cmd_scan_single(pkg: &str, json: bool, verbose: bool) -> i32 {
         Ok(tier) => {
             use shared::scoring::Tier;
             match tier {
-                Tier::Low | Tier::Medium | Tier::High => 0,
-                Tier::Critical | Tier::Malicious => 1,
+                Tier::Trusted | Tier::Ok | Tier::Sketchy => 0,
+                Tier::Suspicious | Tier::Malicious => 1,
             }
         }
         Err(e) => {
@@ -220,15 +220,15 @@ fn cmd_scan_all_installed(jobs: usize, json: bool, verbose: bool, all: bool) -> 
             match result {
                 Ok(scan) => {
                     let idx = match scan.tier {
-                        Tier::Low => 0,
-                        Tier::Medium => 1,
-                        Tier::High => 2,
-                        Tier::Critical => 3,
+                        Tier::Trusted => 0,
+                        Tier::Ok => 1,
+                        Tier::Sketchy => 2,
+                        Tier::Suspicious => 3,
                         Tier::Malicious => 4,
                     };
                     tier_counts[idx].fetch_add(1, Ordering::Relaxed);
 
-                    if all || scan.tier >= Tier::High {
+                    if all || scan.tier >= Tier::Sketchy {
                         flagged.lock().unwrap().push(scan);
                     }
                 }
@@ -248,7 +248,7 @@ fn cmd_scan_all_installed(jobs: usize, json: bool, verbose: bool, all: bool) -> 
     let scanned = total - errors;
 
     if json {
-        flagged.sort_by(|a, b| b.score.cmp(&a.score));
+        flagged.sort_by(|a, b| a.score.cmp(&b.score));
         let json_str = serde_json::to_string_pretty(&flagged).expect("Failed to serialize");
         println!("{json_str}");
     } else {
@@ -256,7 +256,7 @@ fn cmd_scan_all_installed(jobs: usize, json: bool, verbose: bool, all: bool) -> 
         println!("{}", "=== traur scan results ===".bold());
         println!("  Scanned: {} packages ({} errors)", scanned, errors);
         println!(
-            "  LOW: {}  MEDIUM: {}  HIGH: {}  CRITICAL: {}  MALICIOUS: {}",
+            "  TRUSTED: {}  OK: {}  SKETCHY: {}  SUSPICIOUS: {}  MALICIOUS: {}",
             tier_counts[0].load(Ordering::Relaxed),
             tier_counts[1].load(Ordering::Relaxed),
             tier_counts[2].load(Ordering::Relaxed),
@@ -265,14 +265,14 @@ fn cmd_scan_all_installed(jobs: usize, json: bool, verbose: bool, all: bool) -> 
         );
 
         if !flagged.is_empty() {
-            flagged.sort_by(|a, b| b.score.cmp(&a.score));
+            flagged.sort_by(|a, b| a.score.cmp(&b.score));
             println!();
             println!(
                 "{}",
                 format!(
                     "=== {} {} ===",
                     flagged.len(),
-                    if all { "packages" } else { "flagged packages (HIGH+)" }
+                    if all { "packages" } else { "flagged packages (SKETCHY+)" }
                 )
                 .bold()
             );

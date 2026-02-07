@@ -66,7 +66,7 @@ fn main() {
             .red()
             .bold()
     );
-    let _ = writeln!(tty, "  {}", "AUR Package Security Scanner".dimmed());
+    let _ = writeln!(tty, "  {}", "Pre-install trust scoring for AUR packages".dimmed());
     let _ = writeln!(tty);
 
     for pkg in &aur_packages {
@@ -81,9 +81,9 @@ fn main() {
             Ok(ctx) => {
                 let result = coordinator::run_analysis(&ctx);
                 output::write_text(&mut tty, &result, false);
-                if result.tier >= Tier::Critical {
+                if result.tier >= Tier::Suspicious {
                     has_critical = true;
-                } else if result.tier >= Tier::High {
+                } else if result.tier >= Tier::Sketchy {
                     has_high = true;
                 }
             }
@@ -103,7 +103,7 @@ fn main() {
         let _ = writeln!(
             tty,
             "{}",
-            "traur: CRITICAL/MALICIOUS packages detected above".red().bold()
+            "traur: SUSPICIOUS/MALICIOUS packages detected above".red().bold()
         );
         let _ = writeln!(
             tty,
@@ -112,7 +112,7 @@ fn main() {
         std::process::exit(1);
     }
 
-    // Prompt: default Y for low-risk, default N for HIGH
+    // Prompt: default Y for trusted, default N for SKETCHY
     let default_yes = !has_high;
     let prompt_text = if default_yes {
         "traur: Continue with installation? [Y/n]"

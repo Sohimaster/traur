@@ -13,7 +13,7 @@ ALPM (pacman) hook integration for automatic pre-install scanning.
 2. ALPM passes matched package names to `traur-hook` via stdin (one per line)
 3. `traur-hook` filters out official repo packages using `pacman -Si`
 4. Remaining AUR packages are scanned with `traur scan <pkg>`
-5. If any package scores >= CRITICAL, hook exits non-zero
+5. If any package scores SUSPICIOUS or MALICIOUS, hook exits non-zero
 6. `AbortOnFail` in the hook definition causes pacman to abort the transaction
 
 ## Installation

@@ -141,7 +141,7 @@ pub fn run(count: usize, jobs: usize) -> i32 {
                     let idx = tier_to_index(scan.tier);
                     tier_counts[idx].fetch_add(1, Ordering::Relaxed);
 
-                    if scan.tier >= Tier::High {
+                    if scan.tier >= Tier::Sketchy {
                         flagged.lock().unwrap().push(scan);
                     }
                 }
@@ -180,9 +180,9 @@ pub fn run(count: usize, jobs: usize) -> i32 {
     // Print detailed output for HIGH/CRITICAL/MALICIOUS packages
     let mut flagged = flagged.into_inner().unwrap();
     if !flagged.is_empty() {
-        flagged.sort_by(|a, b| b.score.cmp(&a.score));
+        flagged.sort_by(|a, b| a.score.cmp(&b.score));
         println!();
-        println!("{}", format!("=== {} flagged packages (HIGH+) ===", flagged.len()).bold());
+        println!("{}", format!("=== {} flagged packages (SKETCHY+) ===", flagged.len()).bold());
         for result in &flagged {
             println!();
             output::print_text(result, false);
@@ -194,10 +194,10 @@ pub fn run(count: usize, jobs: usize) -> i32 {
 
 fn tier_to_index(tier: Tier) -> usize {
     match tier {
-        Tier::Low => 0,
-        Tier::Medium => 1,
-        Tier::High => 2,
-        Tier::Critical => 3,
+        Tier::Trusted => 0,
+        Tier::Ok => 1,
+        Tier::Sketchy => 2,
+        Tier::Suspicious => 3,
         Tier::Malicious => 4,
     }
 }
@@ -258,12 +258,12 @@ fn print_report(stats: &BenchStats) {
         stats.scanned as f64 / stats.scan_wall_time.as_secs_f64()
     );
     println!();
-    println!("{}", "  Tier distribution:".bold());
-    println!("    LOW:       {:>5}  ({:.1}%)", stats.tier_counts[0], pct(stats.tier_counts[0]));
-    println!("    MEDIUM:    {:>5}  ({:.1}%)", stats.tier_counts[1], pct(stats.tier_counts[1]));
-    println!("    HIGH:      {:>5}  ({:.1}%)", stats.tier_counts[2], pct(stats.tier_counts[2]));
-    println!("    CRITICAL:  {:>5}  ({:.1}%)", stats.tier_counts[3], pct(stats.tier_counts[3]));
-    println!("    MALICIOUS: {:>5}  ({:.1}%)", stats.tier_counts[4], pct(stats.tier_counts[4]));
+    println!("{}", "  Trust distribution:".bold());
+    println!("    TRUSTED:    {:>5}  ({:.1}%)", stats.tier_counts[0], pct(stats.tier_counts[0]));
+    println!("    OK:         {:>5}  ({:.1}%)", stats.tier_counts[1], pct(stats.tier_counts[1]));
+    println!("    SKETCHY:    {:>5}  ({:.1}%)", stats.tier_counts[2], pct(stats.tier_counts[2]));
+    println!("    SUSPICIOUS: {:>5}  ({:.1}%)", stats.tier_counts[3], pct(stats.tier_counts[3]));
+    println!("    MALICIOUS:  {:>5}  ({:.1}%)", stats.tier_counts[4], pct(stats.tier_counts[4]));
 
     if !stats.error_samples.is_empty() {
         println!();

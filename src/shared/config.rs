@@ -72,6 +72,7 @@ pub fn add_to_whitelist(package: &str) -> Result<(), String> {
 }
 
 /// Check if a package is whitelisted in the given config.
+#[allow(dead_code)] // Used by traur-hook binary
 pub fn is_whitelisted_in(config: &Config, package: &str) -> bool {
     config.whitelist.packages.iter().any(|p| p == package)
 }

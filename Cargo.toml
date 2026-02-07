@@ -1,8 +1,8 @@
 [package]
 name = "traur"
-version = "0.1.6"
+version = "0.2.0"
 edition = "2024"
-description = "Heuristic security scanner for AUR packages"
+description = "Pre-install trust scoring for AUR packages"
 license = "MIT"
 
 [[bin]]

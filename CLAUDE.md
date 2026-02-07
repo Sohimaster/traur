@@ -1,6 +1,6 @@
-# traur - AUR Package Security Heuristic Scanner
+# traur - Pre-install Trust Scoring for AUR Packages
 
-Heuristic security scanner for AUR packages. ALPM hook integration for paru/yay.
+Scores AUR packages before you install them. ALPM hook integration for paru/yay.
 
 ## Architecture
 
@@ -21,12 +21,13 @@ PackageContext (metadata + pkgbuild + git)
 
 ## Scoring
 
-Composite score 0-100 from 4 weighted categories:
+Trust score 0-100 (higher = more trusted) from 4 weighted categories:
 ```
-final = 0.15*metadata + 0.45*pkgbuild + 0.25*behavioral + 0.15*temporal
+risk = 0.15*metadata + 0.45*pkgbuild + 0.25*behavioral + 0.15*temporal
+trust = 100 - risk
 ```
 
-Tiers: LOW (0-19), MEDIUM (20-39), HIGH (40-59), CRITICAL (60-79), MALICIOUS (80-100).
+Tiers: TRUSTED (81-100), OK (61-80), SKETCHY (41-60), SUSPICIOUS (21-40), MALICIOUS (0-20).
 
 Override gates: 47 signals across download-and-execute, reverse shells, GTFOBins binary abuse, and variable-concatenated exec escalate directly to MALICIOUS.
 

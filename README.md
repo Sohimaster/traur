@@ -1,7 +1,6 @@
 # traur
 
-Heuristic security scanner for AUR packages. Analyzes PKGBUILDs, install scripts, source URLs, metadata, and git history pre-install.
-integrates into paru/yay as a hook and displays risk analysis
+Pre-install trust scoring for AUR packages. Analyzes PKGBUILDs, install scripts, source URLs, metadata, and git history to score how much you should trust a package before installing it. Integrates into paru/yay as a hook.
 
 <img width="928" height="634" alt="image" src="https://github.com/user-attachments/assets/8dc3d63d-0c06-431e-99b1-1ea06b86af3c" />
 
@@ -55,7 +54,7 @@ Categories: download-and-execute, reverse shells, credential theft, persistence 
 traur bench [--count N] [--jobs J]
 ```
 
-Scans the N most recently modified AUR packages in parallel. Prints detailed signals for HIGH+ packages.
+Scans the N most recently modified AUR packages in parallel. Prints detailed signals for SKETCHY+ packages.
 
 Analysis: **~0.5ms per package** (10 features, 239 regex patterns). Bottleneck is AUR git I/O.
 

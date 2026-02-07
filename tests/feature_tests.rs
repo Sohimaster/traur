@@ -44,8 +44,8 @@ fn benign_pkgbuild_scores_low() {
     let result = scan_pkgbuild("yay", pkgbuild);
 
     assert!(
-        result.tier <= Tier::Medium,
-        "Benign PKGBUILD should score LOW or MEDIUM, got {:?} (score: {})",
+        result.tier <= Tier::Ok,
+        "Benign PKGBUILD should score TRUSTED or OK, got {:?} (trust: {})",
         result.tier,
         result.score
     );
