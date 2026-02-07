@@ -46,33 +46,24 @@ impl Feature for MaintainerAnalysis {
             }
         }
 
-        // Batch upload detection: 3+ packages created within 48 hours
-        if maintainer_pkgs.len() >= 3 {
-            let mut timestamps: Vec<u64> =
-                maintainer_pkgs.iter().map(|p| p.first_submitted).collect();
-            timestamps.sort();
+        // Batch upload detection: 3+ packages created in the last 48 hours
+        let recent_cutoff = now - 48 * 3600;
+        let recent_count = maintainer_pkgs
+            .iter()
+            .filter(|p| p.first_submitted >= recent_cutoff)
+            .count();
 
-            let mut batch_count = 1;
-            for window in timestamps.windows(2) {
-                if window[1] - window[0] < 48 * 3600 {
-                    batch_count += 1;
-                } else {
-                    batch_count = 1;
-                }
-                if batch_count >= 3 {
-                    signals.push(Signal {
-                        id: "B-MAINTAINER-BATCH".to_string(),
-                        category: SignalCategory::Behavioral,
-                        points: 45,
-                        description: format!(
-                            "Maintainer created {batch_count}+ packages within 48 hours"
-                        ),
-                        is_override_gate: false,
-                        matched_line: None,
-                    });
-                    break;
-                }
-            }
+        if recent_count >= 3 {
+            signals.push(Signal {
+                id: "B-MAINTAINER-BATCH".to_string(),
+                category: SignalCategory::Behavioral,
+                points: 45,
+                description: format!(
+                    "Maintainer created {recent_count} packages in the last 48 hours"
+                ),
+                is_override_gate: false,
+                matched_line: None,
+            });
         }
 
         signals
