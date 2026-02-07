@@ -3,7 +3,8 @@
 Heuristic security scanner for AUR packages. Analyzes PKGBUILDs, install scripts, source URLs, metadata, and git history pre-install.
 integrates into paru/yay as a hook and displays risk analysis
 
-<img width="942" height="453" alt="image" src="https://github.com/user-attachments/assets/f9b375a3-d9f9-412c-af73-f80ba86472e8" />
+<img width="928" height="634" alt="image" src="https://github.com/user-attachments/assets/8dc3d63d-0c06-431e-99b1-1ea06b86af3c" />
+
 
 
 ## Installation
