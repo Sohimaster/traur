@@ -1,0 +1,208 @@
+# traur pattern database
+# Each section corresponds to a feature name.
+# Patterns are regular expressions matched against file content.
+
+[[pkgbuild_analysis]]
+id = "P-CURL-PIPE"
+pattern = 'curl\s[^|]*\|\s*(ba)?sh'
+points = 90
+description = "curl output piped to shell (download-and-execute)"
+override_gate = true
+
+[[pkgbuild_analysis]]
+id = "P-WGET-PIPE"
+pattern = 'wget\s[^|]*\|\s*(ba)?sh'
+points = 90
+description = "wget output piped to shell (download-and-execute)"
+override_gate = true
+
+[[pkgbuild_analysis]]
+id = "P-REVSHELL-DEVTCP"
+pattern = '/dev/tcp/'
+points = 95
+description = "Bash reverse shell via /dev/tcp"
+override_gate = true
+
+[[pkgbuild_analysis]]
+id = "P-REVSHELL-NC"
+pattern = '(nc|ncat)\s+(-e|-c)\s'
+points = 95
+description = "Netcat reverse shell"
+override_gate = true
+
+[[pkgbuild_analysis]]
+id = "P-REVSHELL-SOCAT"
+pattern = 'socat\s.*TCP.*EXEC'
+points = 90
+description = "Socat reverse shell"
+override_gate = true
+
+[[pkgbuild_analysis]]
+id = "P-REVSHELL-PYTHON"
+pattern = 'socket\..*connect.*subprocess'
+points = 85
+description = "Python reverse shell pattern"
+override_gate = true
+
+[[pkgbuild_analysis]]
+id = "P-EVAL-BASE64"
+pattern = '(eval.*base64|base64.*eval)'
+points = 85
+description = "Base64-decoded payload executed via eval"
+override_gate = false
+
+[[pkgbuild_analysis]]
+id = "P-BASE64"
+pattern = 'base64\s+(-d|--decode)'
+points = 60
+description = "Base64 decoding (possible payload hiding)"
+override_gate = false
+
+[[pkgbuild_analysis]]
+id = "P-EVAL-VAR"
+pattern = 'eval\s+["$]'
+points = 50
+description = "Dynamic code execution via eval"
+override_gate = false
+
+[[pkgbuild_analysis]]
+id = "P-SOURCE-REMOTE"
+pattern = '(source|\.)\s+<\(curl'
+points = 90
+description = "Sourcing remote script via process substitution"
+override_gate = true
+
+[[pkgbuild_analysis]]
+id = "P-GZIP-EXEC"
+pattern = '(gunzip|zcat)\s.*\|\s*(ba)?sh'
+points = 70
+description = "Compressed payload piped to shell"
+override_gate = false
+
+[[pkgbuild_analysis]]
+id = "P-SSH-ACCESS"
+pattern = '~/\.ssh/|/home/[^/]+/\.ssh/'
+points = 75
+description = "Accessing SSH keys"
+override_gate = false
+
+[[pkgbuild_analysis]]
+id = "P-BROWSER-DATA"
+pattern = '\.(mozilla|config/chromium|config/google-chrome|config/BraveSoftware)/'
+points = 70
+description = "Accessing browser profile data"
+override_gate = false
+
+[[pkgbuild_analysis]]
+id = "P-GPG-ACCESS"
+pattern = '~/\.gnupg/|/home/[^/]+/\.gnupg/'
+points = 65
+description = "Accessing GPG keyring"
+override_gate = false
+
+[[pkgbuild_analysis]]
+id = "P-PROFILE-MOD"
+pattern = '(>>?\s*~/\.(bashrc|zshrc|profile|bash_profile))'
+points = 55
+description = "Modifying shell profile (persistence)"
+override_gate = false
+
+[[pkgbuild_analysis]]
+id = "P-SYSTEMD-CREATE"
+pattern = 'install.*\.service.*systemd|systemctl\s+enable'
+points = 35
+description = "Creating/enabling systemd service"
+override_gate = false
+
+[[pkgbuild_analysis]]
+id = "P-CRON-CREATE"
+pattern = 'crontab|/etc/cron\.d/'
+points = 45
+description = "Creating cron job (persistence)"
+override_gate = false
+
+[[pkgbuild_analysis]]
+id = "P-LD-PRELOAD"
+pattern = 'LD_PRELOAD\s*='
+points = 60
+description = "LD_PRELOAD injection"
+override_gate = false
+
+[[pkgbuild_analysis]]
+id = "P-PASSWD-READ"
+pattern = '/etc/(passwd|shadow)'
+points = 60
+description = "Reading system password files"
+override_gate = false
+
+# Install script patterns
+[[install_script_analysis]]
+id = "P-INSTALL-CURL"
+pattern = 'curl\s'
+points = 70
+description = "curl in install script (should not download during install)"
+override_gate = false
+
+[[install_script_analysis]]
+id = "P-INSTALL-WGET"
+pattern = 'wget\s'
+points = 70
+description = "wget in install script (should not download during install)"
+override_gate = false
+
+[[install_script_analysis]]
+id = "P-INSTALL-PIPE-SHELL"
+pattern = 'curl[^|]*\|\s*(ba)?sh|wget[^|]*\|\s*(ba)?sh'
+points = 90
+description = "Download-and-execute in install script"
+override_gate = true
+
+[[install_script_analysis]]
+id = "P-INSTALL-PERSISTENCE"
+pattern = 'systemctl\s+enable|crontab|/etc/cron\.d/'
+points = 45
+description = "Persistence mechanism in install script"
+override_gate = false
+
+[[install_script_analysis]]
+id = "P-INSTALL-PROFILE-MOD"
+pattern = '>>?\s*~/\.(bashrc|zshrc|profile)'
+points = 55
+description = "Shell profile modification in install script"
+override_gate = false
+
+# Source URL patterns
+[[source_url_analysis]]
+id = "P-RAW-IP-URL"
+pattern = 'https?://\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}'
+points = 50
+description = "Source URL uses raw IP address instead of domain"
+override_gate = false
+
+[[source_url_analysis]]
+id = "P-URL-SHORTENER"
+pattern = '(bit\.ly|tinyurl\.com|t\.co|is\.gd|v\.gd|short\.io)/'
+points = 60
+description = "Source URL uses URL shortener (hiding real destination)"
+override_gate = false
+
+[[source_url_analysis]]
+id = "P-DISCORD-WEBHOOK"
+pattern = 'discord(app)?\.com/api/webhooks/'
+points = 70
+description = "Discord webhook URL (data exfiltration channel)"
+override_gate = false
+
+[[source_url_analysis]]
+id = "P-PASTEBIN"
+pattern = '(pastebin\.com|paste\.ee|hastebin\.com|ptpb\.pw|ix\.io)/'
+points = 50
+description = "Source from paste service (untrusted, mutable content)"
+override_gate = false
+
+[[source_url_analysis]]
+id = "P-DYNAMIC-DNS"
+pattern = '(duckdns\.org|no-ip\.com|ddns\.net|dynu\.com)/'
+points = 55
+description = "Source uses dynamic DNS (common in C2 infrastructure)"
+override_gate = false

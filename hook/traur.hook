@@ -1,0 +1,13 @@
+[Trigger]
+Operation = Install
+Operation = Upgrade
+Type = Package
+Target = *
+
+[Action]
+Description = Scanning packages for security issues...
+When = PreTransaction
+Exec = /usr/bin/traur-hook
+Depends = traur
+NeedsTargets
+AbortOnFail

