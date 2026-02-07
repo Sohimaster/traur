@@ -28,7 +28,7 @@ final = 0.15*metadata + 0.45*pkgbuild + 0.25*behavioral + 0.15*temporal
 
 Tiers: LOW (0-19), MEDIUM (20-39), HIGH (40-59), CRITICAL (60-79), MALICIOUS (80-100).
 
-Override gates: Certain signals (curl|bash, curl|python, reverse shells, Python exec+urlopen) escalate directly to MALICIOUS.
+Override gates: Certain signals (curl|bash, curl|python, reverse shells, Python exec+urlopen, variable-concatenated download-and-execute) escalate directly to MALICIOUS.
 
 ## Build
 
@@ -66,6 +66,7 @@ Edit `data/patterns.toml`. Each pattern has: `id`, `pattern` (regex), `points`, 
 | `src/shared/scoring.rs` | Score computation, tiers, override gates |
 | `src/shared/aur_rpc.rs` | AUR RPC v5 API client |
 | `src/shared/aur_git.rs` | Git clone/pull/diff operations |
+| `src/features/shell_analysis/` | Beyond-regex static analysis (var concat, indirect exec, char-by-char, data blobs, binary download) |
 | `data/patterns.toml` | Regex pattern database |
 | `src/bench.rs` | Batch benchmark (parallel scan, retry, stats) |
 | `hook/traur.hook` | ALPM hook definition |

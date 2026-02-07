@@ -25,6 +25,7 @@ Features receive a `PackageContext` (all collected data about a package) and ret
 | `name_analysis` | Typosquatting and impersonation | Behavioral | 0.25 |
 | `maintainer_analysis` | Maintainer reputation signals | Behavioral | 0.25 |
 | `git_history_analysis` | Temporal signals from git history | Temporal | 0.15 |
+| `shell_analysis` | Beyond-regex obfuscation (var concat, indirect exec, char-by-char, data blobs, binary download) | Pkgbuild | 0.45 |
 
 ## Adding a new feature
 

@@ -5,6 +5,7 @@ pub mod maintainer_analysis;
 pub mod metadata_analysis;
 pub mod name_analysis;
 pub mod pkgbuild_analysis;
+pub mod shell_analysis;
 pub mod source_url_analysis;
 
 use crate::shared::models::PackageContext;
@@ -28,5 +29,6 @@ pub fn all_features() -> Vec<Box<dyn Feature>> {
         Box::new(name_analysis::NameAnalysis),
         Box::new(maintainer_analysis::MaintainerAnalysis),
         Box::new(git_history_analysis::GitHistoryAnalysis),
+        Box::new(shell_analysis::ShellAnalysis),
     ]
 }
