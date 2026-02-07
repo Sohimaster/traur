@@ -47,20 +47,39 @@ const WEIGHT_TEMPORAL: f64 = 0.15;
 
 /// Compute the final score and tier from a list of signals.
 pub fn compute_score(package_name: &str, signals: &[Signal]) -> ScanResult {
-    // Check override gates first — they bypass weighted scoring
-    for signal in signals {
-        if signal.is_override_gate {
-            return ScanResult {
-                package: package_name.to_string(),
-                score: signal.points.min(100),
-                tier: Tier::Malicious,
-                signals: signals.to_vec(),
-                override_gate_fired: Some(signal.id.clone()),
-            };
-        }
+    let weighted_score = compute_weighted(signals);
+
+    // Find the highest-scoring override gate
+    let best_override = signals
+        .iter()
+        .filter(|s| s.is_override_gate)
+        .max_by_key(|s| s.points);
+
+    if let Some(signal) = best_override {
+        // Use the higher of the override gate score and the weighted score
+        let score = signal.points.max(weighted_score).min(100);
+        return ScanResult {
+            package: package_name.to_string(),
+            score,
+            tier: Tier::Malicious,
+            signals: signals.to_vec(),
+            override_gate_fired: Some(signal.id.clone()),
+        };
     }
 
-    // Aggregate points per category (capped at 100 each)
+    let tier = score_to_tier(weighted_score);
+
+    ScanResult {
+        package: package_name.to_string(),
+        score: weighted_score,
+        tier,
+        signals: signals.to_vec(),
+        override_gate_fired: None,
+    }
+}
+
+/// Compute the weighted composite score from signals (without override gate logic).
+fn compute_weighted(signals: &[Signal]) -> u32 {
     let mut meta_total: u32 = 0;
     let mut pkgbuild_total: u32 = 0;
     let mut behavioral_total: u32 = 0;
@@ -85,16 +104,7 @@ pub fn compute_score(package_name: &str, signals: &[Signal]) -> ScanResult {
         + (WEIGHT_BEHAVIORAL * behavioral_total as f64)
         + (WEIGHT_TEMPORAL * temporal_total as f64);
 
-    let score = (weighted.round() as u32).min(100);
-    let tier = score_to_tier(score);
-
-    ScanResult {
-        package: package_name.to_string(),
-        score,
-        tier,
-        signals: signals.to_vec(),
-        override_gate_fired: None,
-    }
+    (weighted.round() as u32).min(100)
 }
 
 fn score_to_tier(score: u32) -> Tier {
@@ -116,5 +126,95 @@ impl std::fmt::Display for Tier {
             Tier::Critical => write!(f, "CRITICAL"),
             Tier::Malicious => write!(f, "MALICIOUS"),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn signal(id: &str, category: SignalCategory, points: u32, override_gate: bool) -> Signal {
+        Signal {
+            id: id.to_string(),
+            category,
+            points,
+            description: String::new(),
+            is_override_gate: override_gate,
+        }
+    }
+
+    #[test]
+    fn no_signals_scores_zero() {
+        let result = compute_score("pkg", &[]);
+        assert_eq!(result.score, 0);
+        assert_eq!(result.tier, Tier::Low);
+        assert!(result.override_gate_fired.is_none());
+    }
+
+    #[test]
+    fn override_gate_picks_highest() {
+        let signals = vec![
+            signal("P-CURL-PIPE", SignalCategory::Pkgbuild, 90, true),
+            signal("P-REVSHELL-DEVTCP", SignalCategory::Pkgbuild, 95, true),
+        ];
+        let result = compute_score("pkg", &signals);
+        assert_eq!(result.tier, Tier::Malicious);
+        assert_eq!(result.override_gate_fired.as_deref(), Some("P-REVSHELL-DEVTCP"));
+        assert!(result.score >= 95);
+    }
+
+    #[test]
+    fn override_gate_uses_weighted_when_higher() {
+        // Override gate (85) + lots of other signals that push weighted above 85
+        let signals = vec![
+            signal("P-REVSHELL-PYTHON", SignalCategory::Pkgbuild, 85, true),
+            signal("P-EVAL-BASE64", SignalCategory::Pkgbuild, 85, false),
+            signal("B-NAME-IMPERSONATE", SignalCategory::Behavioral, 65, false),
+            signal("M-VOTES-ZERO", SignalCategory::Metadata, 30, false),
+            signal("T-MALICIOUS-DIFF", SignalCategory::Temporal, 55, false),
+        ];
+        let result = compute_score("pkg", &signals);
+        assert_eq!(result.tier, Tier::Malicious);
+        // Weighted: 0.45*100 + 0.25*65 + 0.15*30 + 0.15*55 = 45+16.25+4.5+8.25 = 74
+        // Override gate: 85. Max(85, 74) = 85
+        assert!(result.score >= 85, "Score {} should be >= 85", result.score);
+    }
+
+    #[test]
+    fn category_caps_at_100() {
+        let signals = vec![
+            signal("P-A", SignalCategory::Pkgbuild, 80, false),
+            signal("P-B", SignalCategory::Pkgbuild, 80, false),
+        ];
+        let result = compute_score("pkg", &signals);
+        // Pkgbuild: min(160, 100) = 100 -> 0.45 * 100 = 45
+        assert_eq!(result.score, 45);
+        assert_eq!(result.tier, Tier::High);
+    }
+
+    #[test]
+    fn tier_boundaries() {
+        assert_eq!(score_to_tier(0), Tier::Low);
+        assert_eq!(score_to_tier(19), Tier::Low);
+        assert_eq!(score_to_tier(20), Tier::Medium);
+        assert_eq!(score_to_tier(39), Tier::Medium);
+        assert_eq!(score_to_tier(40), Tier::High);
+        assert_eq!(score_to_tier(59), Tier::High);
+        assert_eq!(score_to_tier(60), Tier::Critical);
+        assert_eq!(score_to_tier(79), Tier::Critical);
+        assert_eq!(score_to_tier(80), Tier::Malicious);
+        assert_eq!(score_to_tier(100), Tier::Malicious);
+    }
+
+    #[test]
+    fn max_score_is_100() {
+        let signals = vec![
+            signal("P", SignalCategory::Pkgbuild, 200, false),
+            signal("M", SignalCategory::Metadata, 200, false),
+            signal("B", SignalCategory::Behavioral, 200, false),
+            signal("T", SignalCategory::Temporal, 200, false),
+        ];
+        let result = compute_score("pkg", &signals);
+        assert_eq!(result.score, 100);
     }
 }

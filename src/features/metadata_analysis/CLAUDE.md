@@ -10,7 +10,6 @@ Analyzes AUR RPC metadata for reputation and completeness signals.
 - **Orphaned** (M-NO-MAINTAINER, +20): No maintainer — Xeactor attack vector
 - **No URL** (M-NO-URL, +15): Missing upstream project URL
 - **No license** (M-NO-LICENSE, +10): Missing license
-- **Old with no engagement** (M-OLD-NO-VOTES, +15): Package older than 1 year with zero votes and zero popularity
 - **Out of date** (M-OUT-OF-DATE, +5): Flagged as outdated
 
 ## Signals emitted

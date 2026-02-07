@@ -79,24 +79,6 @@ impl Feature for MetadataAnalysis {
             });
         }
 
-        // Old package with zero engagement
-        let now = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
-            .as_secs();
-        let age_days = (now - meta.first_submitted) / 86400;
-        if age_days > 365 && meta.num_votes == 0 && meta.popularity == 0.0 {
-            signals.push(Signal {
-                id: "M-OLD-NO-VOTES".to_string(),
-                category: SignalCategory::Metadata,
-                points: 15,
-                description: format!(
-                    "Package is {age_days} days old with zero votes and zero popularity"
-                ),
-                is_override_gate: false,
-            });
-        }
-
         // Out of date
         if meta.out_of_date.is_some() {
             signals.push(Signal {

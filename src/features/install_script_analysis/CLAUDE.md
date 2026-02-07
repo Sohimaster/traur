@@ -6,9 +6,12 @@ Analyzes `.install` files (pre/post install/upgrade/remove hooks) for suspicious
 
 - **Network activity**: curl/wget in install hooks — install scripts should not download anything
 - **Download-and-execute**: curl|bash in install context — override gate
-- **Persistence**: systemd enable, cron jobs in install hooks
+- **Shell obfuscation**: `$IFS`, ANSI-C hex quoting, ROT13 via `tr`
+- **Persistence**: systemd enable, cron jobs, XDG autostart, PROMPT_COMMAND injection
 - **Profile modification**: Writing to .bashrc/.zshrc during install
 - **Credential access**: SSH keys, browser profiles, GPG keyring, /etc/passwd access
+- **Privilege escalation**: sudoers modification
+- **Anti-forensics**: history clearing, log clearing/truncation
 - **Obfuscation**: base64 decoding, eval in install scripts
 
 ## Signals emitted
@@ -22,7 +25,7 @@ All signals use `SignalCategory::Pkgbuild` (weight 0.45). See `data/patterns.tom
 
 ## Known false positives
 
-- `P-INSTALL-CURL` (+70): Some packages legitimately fetch post-install data (e.g., font caches, database updates). Rare but possible.
+- `P-INSTALL-CURL` (+45): Some packages legitimately fetch post-install data (e.g., font caches, database updates). Rare but possible.
 - `P-INSTALL-PERSISTENCE` (+45): Packages providing daemons legitimately enable their systemd service in post_install.
 
 ## Performance

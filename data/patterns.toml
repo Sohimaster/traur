@@ -378,18 +378,250 @@ points = 55
 description = "Accessing sensitive environment variables (token/credential theft)"
 override_gate = false
 
+# Shell obfuscation
+[[pkgbuild_analysis]]
+id = "P-IFS-OBFUSCATION"
+pattern = '\$\{?IFS\}?'
+points = 60
+description = "$IFS variable used as command separator (shell obfuscation)"
+override_gate = false
+
+[[pkgbuild_analysis]]
+id = "P-ANSI-C-HEX"
+pattern = '''\$'\\x[0-9a-fA-F]{2}'''
+points = 65
+description = "ANSI-C hex quoting to hide command strings"
+override_gate = false
+
+[[pkgbuild_analysis]]
+id = "P-ROT13"
+pattern = 'tr\s.*n-za-m'
+points = 60
+description = "ROT13 encoding/decoding (payload obfuscation)"
+override_gate = false
+
+[[pkgbuild_analysis]]
+id = "P-OCTAL-ENCODE"
+pattern = '(printf|echo\s+-e)\s+.*\\[0-7]{3}.*\\[0-7]{3}.*\\[0-7]{3}'
+points = 55
+description = "Octal-encoded payload in printf/echo (3+ sequences)"
+override_gate = false
+
+[[pkgbuild_analysis]]
+id = "P-REV-EXEC"
+pattern = 'rev\s.*\|\s*(ba)?sh'
+points = 70
+description = "Reversed string piped to shell (obfuscation)"
+override_gate = false
+
+# Reverse shells - additional languages
+[[pkgbuild_analysis]]
+id = "P-REVSHELL-PERL"
+pattern = 'perl\s.*Socket.*connect|perl\s.*INET.*exec'
+points = 85
+description = "Perl reverse shell (Socket + connect/exec)"
+override_gate = true
+
+[[pkgbuild_analysis]]
+id = "P-REVSHELL-RUBY"
+pattern = 'ruby\s.*TCPSocket'
+points = 85
+description = "Ruby reverse shell (TCPSocket)"
+override_gate = true
+
+[[pkgbuild_analysis]]
+id = "P-REVSHELL-AWK"
+pattern = 'awk\s.*/inet/tcp'
+points = 85
+description = "Awk reverse shell (/inet/tcp)"
+override_gate = true
+
+[[pkgbuild_analysis]]
+id = "P-REVSHELL-LUA"
+pattern = 'lua\s.*socket\.tcp|lua.*socket.*connect'
+points = 85
+description = "Lua reverse shell (socket.tcp)"
+override_gate = true
+
+[[pkgbuild_analysis]]
+id = "P-REVSHELL-PHP"
+pattern = 'php\s.*fsockopen|php.*socket_connect'
+points = 85
+description = "PHP reverse shell (fsockopen/socket_connect)"
+override_gate = true
+
+# Download-and-execute variants
+[[pkgbuild_analysis]]
+id = "P-DECOMPRESS-EXEC"
+pattern = '(bunzip2|bzcat|xzcat|unxz|lzcat|zstdcat|lz4cat)\s.*\|\s*(ba)?sh'
+points = 70
+description = "Decompressed payload piped to shell"
+override_gate = false
+
+[[pkgbuild_analysis]]
+id = "P-PROC-SUB-DOWNLOAD"
+pattern = '<\(\s*(curl|wget)\s'
+points = 75
+description = "Process substitution with download command"
+override_gate = false
+
+[[pkgbuild_analysis]]
+id = "P-RUBY-EXEC-URL"
+pattern = 'ruby.*(Net::HTTP|open-uri|URI\.open).*(eval|exec|system)|ruby.*(eval|exec|system).*(Net::HTTP|open-uri|URI\.open)'
+points = 85
+description = "Ruby fetch-and-execute"
+override_gate = true
+
+[[pkgbuild_analysis]]
+id = "P-PERL-EXEC-URL"
+pattern = 'perl.*LWP.*(system|exec)|perl.*HTTP::Tiny.*(system|exec)'
+points = 85
+description = "Perl fetch-and-execute (LWP/HTTP::Tiny + system/exec)"
+override_gate = true
+
+[[pkgbuild_analysis]]
+id = "P-DEV-UDP"
+pattern = '/dev/udp/'
+points = 85
+description = "Bash /dev/udp network connection"
+override_gate = true
+
+# Encoding bypasses
+[[pkgbuild_analysis]]
+id = "P-BASE32"
+pattern = 'base32\s+(-d|--decode)'
+points = 60
+description = "Base32 decoding (payload hiding)"
+override_gate = false
+
+[[pkgbuild_analysis]]
+id = "P-OPENSSL-DECRYPT"
+pattern = 'openssl\s+(enc|aes-256-cbc|des|bf)\s.*-d'
+points = 65
+description = "OpenSSL decryption (encrypted payload)"
+override_gate = false
+
+[[pkgbuild_analysis]]
+id = "P-TELNET-PIPE"
+pattern = 'telnet\s+\S+\s+\d+\s*\|'
+points = 70
+description = "Telnet connection piped to command"
+override_gate = false
+
+# Persistence mechanisms
+[[pkgbuild_analysis]]
+id = "P-XDG-AUTOSTART"
+pattern = '\.config/autostart'
+points = 55
+description = "XDG autostart entry creation"
+override_gate = false
+
+[[pkgbuild_analysis]]
+id = "P-SYSTEMD-USER"
+pattern = '\.config/systemd/user/'
+points = 50
+description = "Systemd user service creation (no root required)"
+override_gate = false
+
+[[pkgbuild_analysis]]
+id = "P-UDEV-RULE"
+pattern = '/etc/udev/rules\.d/'
+points = 45
+description = "Udev rule creation"
+override_gate = false
+
+[[pkgbuild_analysis]]
+id = "P-AT-JOB"
+pattern = '\bat\s+(now|midnight|noon|teatime|\d{1,2}:\d{2})'
+points = 60
+description = "at job scheduling (deferred execution)"
+override_gate = false
+
+[[pkgbuild_analysis]]
+id = "P-PROMPT-COMMAND"
+pattern = 'PROMPT_COMMAND\s*='
+points = 65
+description = "PROMPT_COMMAND injection (runs on every prompt)"
+override_gate = false
+
+[[pkgbuild_analysis]]
+id = "P-BASH-LOGOUT"
+pattern = '\.bash_logout'
+points = 55
+description = ".bash_logout modification (runs on session exit)"
+override_gate = false
+
+# Privilege escalation
+[[pkgbuild_analysis]]
+id = "P-SUDOERS-MOD"
+pattern = '/etc/sudoers'
+points = 75
+description = "Sudoers file access/modification"
+override_gate = false
+
+[[pkgbuild_analysis]]
+id = "P-POLKIT-RULE"
+pattern = '/etc/polkit-1/rules\.d/'
+points = 55
+description = "Polkit rule creation"
+override_gate = false
+
+[[pkgbuild_analysis]]
+id = "P-SETCAP"
+pattern = 'setcap\s+cap_'
+points = 65
+description = "Linux capability manipulation"
+override_gate = false
+
+# Anti-forensics
+[[pkgbuild_analysis]]
+id = "P-HISTORY-CLEAR"
+pattern = 'unset\s+HISTFILE|HISTFILE=/dev/null|history\s+-c|set\s+\+o\s+history'
+points = 70
+description = "Shell history clearing/suppression"
+override_gate = false
+
+[[pkgbuild_analysis]]
+id = "P-LOG-CLEAR"
+pattern = 'rm\s+(-[rf]+\s+)?/var/log|truncate\s+.*\s+/var/log|>\s*/var/log/'
+points = 75
+description = "System log clearing/truncation"
+override_gate = false
+
+# AUR-specific and other
+[[pkgbuild_analysis]]
+id = "P-PACMAN-HOOK"
+pattern = '/usr/share/libalpm/hooks/|/etc/pacman\.d/hooks/'
+points = 50
+description = "Pacman hook creation (unusual for AUR packages)"
+override_gate = false
+
+[[pkgbuild_analysis]]
+id = "P-DD-WRITE"
+pattern = 'dd\s+.*of=/dev/'
+points = 70
+description = "dd writing to device file"
+override_gate = false
+
+[[pkgbuild_analysis]]
+id = "P-ALIAS-OVERRIDE"
+pattern = 'alias\s+(ls|cat|cd|rm|mv|cp|sudo|su|passwd|login|ssh)='
+points = 65
+description = "Alias override of common system commands"
+override_gate = false
+
 # Install script patterns
 [[install_script_analysis]]
 id = "P-INSTALL-CURL"
 pattern = 'curl\s'
-points = 70
+points = 45
 description = "curl in install script (should not download during install)"
 override_gate = false
 
 [[install_script_analysis]]
 id = "P-INSTALL-WGET"
 pattern = 'wget\s'
-points = 70
+points = 45
 description = "wget in install script (should not download during install)"
 override_gate = false
 
@@ -510,6 +742,62 @@ id = "P-INSTALL-ENV-TOKENS"
 pattern = '\$(AWS_SECRET_ACCESS_KEY|AWS_ACCESS_KEY_ID|GITHUB_TOKEN|GH_TOKEN|GITLAB_TOKEN|NPM_TOKEN|DOCKER_PASSWORD|API_KEY|SECRET_KEY|PRIVATE_KEY|SLACK_TOKEN|DISCORD_TOKEN)'
 points = 65
 description = "Accessing sensitive environment variables in install script"
+override_gate = false
+
+[[install_script_analysis]]
+id = "P-INSTALL-IFS"
+pattern = '\$\{?IFS\}?'
+points = 65
+description = "$IFS used in install script (obfuscation)"
+override_gate = false
+
+[[install_script_analysis]]
+id = "P-INSTALL-ANSI-C-HEX"
+pattern = '''\$'\\x[0-9a-fA-F]{2}'''
+points = 70
+description = "ANSI-C hex quoting in install script"
+override_gate = false
+
+[[install_script_analysis]]
+id = "P-INSTALL-ROT13"
+pattern = 'tr\s.*n-za-m'
+points = 65
+description = "ROT13 encoding in install script"
+override_gate = false
+
+[[install_script_analysis]]
+id = "P-INSTALL-HISTORY-CLEAR"
+pattern = 'unset\s+HISTFILE|HISTFILE=/dev/null|history\s+-c|set\s+\+o\s+history'
+points = 75
+description = "Shell history clearing in install script"
+override_gate = false
+
+[[install_script_analysis]]
+id = "P-INSTALL-LOG-CLEAR"
+pattern = 'rm\s+(-[rf]+\s+)?/var/log|truncate\s+.*\s+/var/log|>\s*/var/log/'
+points = 80
+description = "Log clearing in install script"
+override_gate = false
+
+[[install_script_analysis]]
+id = "P-INSTALL-SUDOERS-MOD"
+pattern = '/etc/sudoers'
+points = 80
+description = "Sudoers access in install script"
+override_gate = false
+
+[[install_script_analysis]]
+id = "P-INSTALL-PROMPT-COMMAND"
+pattern = 'PROMPT_COMMAND\s*='
+points = 70
+description = "PROMPT_COMMAND injection from install script"
+override_gate = false
+
+[[install_script_analysis]]
+id = "P-INSTALL-XDG-AUTOSTART"
+pattern = '\.config/autostart'
+points = 60
+description = "XDG autostart creation from install script"
 override_gate = false
 
 # Source URL patterns
