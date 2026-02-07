@@ -11,20 +11,20 @@ pub fn print_text(result: &ScanResult, verbose: bool) {
         Tier::Malicious => result.tier.to_string().red().bold(),
     };
 
-    println!(
+    eprintln!(
         "{} {} (score: {}/100)",
         "traur:".bold(),
         result.package.bold(),
         result.score
     );
-    println!("  Tier: {tier_colored}");
+    eprintln!("  Tier: {tier_colored}");
 
     if let Some(ref gate) = result.override_gate_fired {
-        println!("  {} Override gate fired: {gate}", "!!".red().bold());
+        eprintln!("  {} Override gate fired: {gate}", "!!".red().bold());
     }
 
     if !result.signals.is_empty() {
-        println!("  Signals:");
+        eprintln!("  Signals:");
         for signal in &result.signals {
             let prefix = if signal.is_override_gate {
                 "!!".red().bold().to_string()
@@ -35,13 +35,13 @@ pub fn print_text(result: &ScanResult, verbose: bool) {
             } else {
                 "  ".to_string()
             };
-            println!(
+            eprintln!(
                 "    {prefix} [{:>3}] {}: {}",
                 signal.points, signal.id, signal.description
             );
             if verbose {
                 if let Some(ref line) = signal.matched_line {
-                    println!("             {} {}", ">".dimmed(), line.dimmed());
+                    eprintln!("             {} {}", ">".dimmed(), line.dimmed());
                 }
             }
         }

@@ -1,3 +1,4 @@
 /target
 .idea/
 *.log
+pkg/*.tar.gz
