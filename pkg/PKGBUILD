@@ -1,5 +1,5 @@
 pkgname=traur
-pkgver=0.1.5
+pkgver=0.1.6
 pkgrel=1
 pkgdesc='Heuristic security scanner for AUR packages'
 arch=('x86_64')
