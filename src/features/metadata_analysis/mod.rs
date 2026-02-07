@@ -5,10 +5,6 @@ use crate::shared::scoring::{Signal, SignalCategory};
 pub struct MetadataAnalysis;
 
 impl Feature for MetadataAnalysis {
-    fn name(&self) -> &str {
-        "metadata_analysis"
-    }
-
     fn analyze(&self, ctx: &PackageContext) -> Vec<Signal> {
         let Some(ref meta) = ctx.metadata else {
             return Vec::new();
@@ -24,6 +20,7 @@ impl Feature for MetadataAnalysis {
                 points: 30,
                 description: "Package has zero votes".to_string(),
                 is_override_gate: false,
+                matched_line: None,
             });
         } else if meta.num_votes < 5 {
             signals.push(Signal {
@@ -32,6 +29,7 @@ impl Feature for MetadataAnalysis {
                 points: 20,
                 description: format!("Package has very few votes ({})", meta.num_votes),
                 is_override_gate: false,
+                matched_line: None,
             });
         }
 
@@ -43,6 +41,7 @@ impl Feature for MetadataAnalysis {
                 points: 25,
                 description: "Popularity is 0 (no recent usage)".to_string(),
                 is_override_gate: false,
+                matched_line: None,
             });
         }
 
@@ -54,6 +53,7 @@ impl Feature for MetadataAnalysis {
                 points: 20,
                 description: "Package is orphaned (no maintainer)".to_string(),
                 is_override_gate: false,
+                matched_line: None,
             });
         }
 
@@ -65,6 +65,7 @@ impl Feature for MetadataAnalysis {
                 points: 15,
                 description: "No upstream URL provided".to_string(),
                 is_override_gate: false,
+                matched_line: None,
             });
         }
 
@@ -76,6 +77,7 @@ impl Feature for MetadataAnalysis {
                 points: 10,
                 description: "No license specified".to_string(),
                 is_override_gate: false,
+                matched_line: None,
             });
         }
 
@@ -87,6 +89,7 @@ impl Feature for MetadataAnalysis {
                 points: 5,
                 description: "Package is flagged as out of date".to_string(),
                 is_override_gate: false,
+                matched_line: None,
             });
         }
 
@@ -105,27 +108,15 @@ mod tests {
             .unwrap()
             .as_secs();
         AurPackage {
-            id: 1,
             name: "test-pkg".into(),
             package_base: None,
-            version: "1.0".into(),
-            description: None,
             url: url.map(|s| s.to_string()),
             num_votes: votes,
             popularity,
             out_of_date,
             maintainer: maintainer.map(|s| s.to_string()),
             first_submitted: now - 86400, // 1 day ago
-            last_modified: now,
-            depends: None,
-            make_depends: None,
-            opt_depends: None,
-            check_depends: None,
-            conflicts: None,
-            provides: None,
-            replaces: None,
             license,
-            keywords: None,
         }
     }
 

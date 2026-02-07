@@ -1,9 +1,9 @@
 pkgname=traur
-pkgver=0.1.0
+pkgver=0.1.1
 pkgrel=1
 pkgdesc='Heuristic security scanner for AUR packages'
 arch=('x86_64')
-url='https://github.com/USER/traur'
+url='https://github.com/Sohimaster/traur'
 license=('MIT')
 depends=('git' 'pacman')
 makedepends=('cargo')

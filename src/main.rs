@@ -35,6 +35,14 @@ enum Commands {
         /// Output as JSON
         #[arg(long)]
         json: bool,
+
+        /// Show the exact line that triggered each signal
+        #[arg(short = 'v', long)]
+        verbose: bool,
+
+        /// Show all packages (including LOW and MEDIUM)
+        #[arg(short = 'a', long)]
+        all: bool,
     },
     /// Show detailed signal breakdown for a package
     Report {
@@ -44,6 +52,10 @@ enum Commands {
         /// Output as JSON
         #[arg(long)]
         json: bool,
+
+        /// Show the exact line that triggered each signal
+        #[arg(short = 'v', long)]
+        verbose: bool,
     },
     /// Whitelist a package (skip future scans)
     Allow {
@@ -72,8 +84,10 @@ fn main() {
             all_installed,
             jobs,
             json,
-        } => cmd_scan(package, pkgbuild, all_installed, jobs, json),
-        Commands::Report { package, json } => cmd_report(&package, json),
+            verbose,
+            all,
+        } => cmd_scan(package, pkgbuild, all_installed, jobs, json, verbose, all),
+        Commands::Report { package, json, verbose } => cmd_report(&package, json, verbose),
         Commands::Allow { package } => cmd_allow(&package),
         Commands::Bench { count, jobs } => bench::run(count, jobs),
     };
@@ -87,23 +101,41 @@ fn cmd_scan(
     _all_installed: bool,
     jobs: usize,
     json: bool,
+    verbose: bool,
+    all: bool,
 ) -> i32 {
     if let Some(path) = pkgbuild {
-        eprintln!("Scanning local PKGBUILD at {path}...");
-        // TODO: local PKGBUILD scan
-        return 0;
+        let content = match std::fs::read_to_string(&path) {
+            Ok(c) => c,
+            Err(e) => {
+                eprintln!("Error reading {path}: {e}");
+                return 1;
+            }
+        };
+        let name = std::path::Path::new(&path)
+            .parent()
+            .and_then(|p| p.file_name())
+            .and_then(|n| n.to_str())
+            .unwrap_or("local");
+        let result = coordinator::scan_pkgbuild(name, &content);
+        if json {
+            shared::output::print_json(&result);
+        } else {
+            shared::output::print_text(&result, verbose);
+        }
+        return if result.tier >= shared::scoring::Tier::Critical { 1 } else { 0 };
     }
 
     if let Some(pkg) = package {
-        return cmd_scan_single(&pkg, json);
+        return cmd_scan_single(&pkg, json, verbose);
     }
 
     // No package, no pkgbuild -> scan all installed AUR packages
-    cmd_scan_all_installed(jobs, json)
+    cmd_scan_all_installed(jobs, json, verbose, all)
 }
 
-fn cmd_scan_single(pkg: &str, json: bool) -> i32 {
-    match coordinator::scan_package(pkg, json) {
+fn cmd_scan_single(pkg: &str, json: bool, verbose: bool) -> i32 {
+    match coordinator::scan_package(pkg, json, verbose) {
         Ok(tier) => {
             use shared::scoring::Tier;
             match tier {
@@ -118,7 +150,7 @@ fn cmd_scan_single(pkg: &str, json: bool) -> i32 {
     }
 }
 
-fn cmd_scan_all_installed(jobs: usize, json: bool) -> i32 {
+fn cmd_scan_all_installed(jobs: usize, json: bool, verbose: bool, all: bool) -> i32 {
     use crate::shared::bulk::{batch_fetch_metadata, clone_with_retry, prefetch_maintainer_packages};
     use crate::shared::scoring::{ScanResult, Tier};
     use colored::Colorize;
@@ -196,7 +228,7 @@ fn cmd_scan_all_installed(jobs: usize, json: bool) -> i32 {
                     };
                     tier_counts[idx].fetch_add(1, Ordering::Relaxed);
 
-                    if scan.tier >= Tier::High {
+                    if all || scan.tier >= Tier::High {
                         flagged.lock().unwrap().push(scan);
                     }
                 }
@@ -237,11 +269,16 @@ fn cmd_scan_all_installed(jobs: usize, json: bool) -> i32 {
             println!();
             println!(
                 "{}",
-                format!("=== {} flagged packages (HIGH+) ===", flagged.len()).bold()
+                format!(
+                    "=== {} {} ===",
+                    flagged.len(),
+                    if all { "packages" } else { "flagged packages (HIGH+)" }
+                )
+                .bold()
             );
             for result in &flagged {
                 println!();
-                shared::output::print_text(result);
+                shared::output::print_text(result, verbose);
             }
         } else {
             println!();
@@ -284,8 +321,8 @@ fn get_installed_aur_packages() -> Result<Vec<String>, String> {
     Ok(names)
 }
 
-fn cmd_report(package: &str, json: bool) -> i32 {
-    match coordinator::scan_package(package, json) {
+fn cmd_report(package: &str, json: bool, verbose: bool) -> i32 {
+    match coordinator::scan_package(package, json, verbose) {
         Ok(_) => 0,
         Err(e) => {
             eprintln!("Error: {e}");
@@ -295,7 +332,15 @@ fn cmd_report(package: &str, json: bool) -> i32 {
 }
 
 fn cmd_allow(package: &str) -> i32 {
-    eprintln!("Whitelisted: {package}");
-    // TODO: persist to config
-    0
+    match shared::config::add_to_whitelist(package) {
+        Ok(()) => {
+            eprintln!("Whitelisted: {package}");
+            eprintln!("  Saved to {}", shared::config::config_path().display());
+            0
+        }
+        Err(e) => {
+            eprintln!("Error: {e}");
+            1
+        }
+    }
 }

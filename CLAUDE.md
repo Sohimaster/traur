@@ -63,7 +63,7 @@ Edit `data/patterns.toml`. Each pattern has: `id`, `pattern` (regex), `points`, 
 |------|---------|
 | `src/coordinator.rs` | Orchestrates features and scoring |
 | `src/features/mod.rs` | Feature trait + registry |
-| `src/shared/scoring.rs` | Score computation, tiers, override gates |
+| `src/shared/scoring.rs` | Score computation, tiers, override gates. Signal has `matched_line: Option<String>` for verbose output |
 | `src/shared/aur_rpc.rs` | AUR RPC v5 API client |
 | `src/shared/aur_git.rs` | Git clone/pull/diff operations |
 | `src/shared/bulk.rs` | Batch metadata fetch, maintainer prefetch, clone-with-retry |

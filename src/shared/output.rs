@@ -2,7 +2,7 @@ use crate::shared::scoring::{ScanResult, Tier};
 use colored::Colorize;
 
 /// Print scan result as colored terminal text.
-pub fn print_text(result: &ScanResult) {
+pub fn print_text(result: &ScanResult, verbose: bool) {
     let tier_colored = match result.tier {
         Tier::Low => result.tier.to_string().green(),
         Tier::Medium => result.tier.to_string().yellow(),
@@ -39,6 +39,11 @@ pub fn print_text(result: &ScanResult) {
                 "    {prefix} [{:>3}] {}: {}",
                 signal.points, signal.id, signal.description
             );
+            if verbose {
+                if let Some(ref line) = signal.matched_line {
+                    println!("             {} {}", ">".dimmed(), line.dimmed());
+                }
+            }
         }
     }
 }

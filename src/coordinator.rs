@@ -4,38 +4,21 @@ use crate::shared::output;
 use crate::shared::scoring::{self, ScanResult, Tier};
 
 /// Scan a package by name, printing results. Returns the computed tier.
-pub fn scan_package(package_name: &str, json: bool) -> Result<Tier, String> {
+pub fn scan_package(package_name: &str, json: bool, verbose: bool) -> Result<Tier, String> {
     let ctx = build_context(package_name)?;
     let result = run_analysis(&ctx);
 
     if json {
         output::print_json(&result);
     } else {
-        output::print_text(&result);
+        output::print_text(&result, verbose);
     }
 
     Ok(result.tier)
 }
 
-/// Scan a package silently, returning the ScanResult without printing.
-pub fn scan_package_silent(package_name: &str) -> Result<ScanResult, String> {
-    let ctx = build_context(package_name)?;
-    Ok(run_analysis(&ctx))
-}
-
-/// Scan with pre-fetched metadata and maintainer packages (only git clone hits the network).
-/// Returns Err if git clone fails — no PKGBUILD means no meaningful scan.
-pub fn scan_package_prefetched(
-    package_name: &str,
-    metadata: crate::shared::models::AurPackage,
-    maintainer_packages: Vec<crate::shared::models::AurPackage>,
-) -> Result<ScanResult, String> {
-    let ctx = build_context_prefetched(package_name, metadata, maintainer_packages)?;
-    Ok(run_analysis(&ctx))
-}
-
 /// Build a PackageContext by fetching all data needed for analysis.
-fn build_context(package_name: &str) -> Result<PackageContext, String> {
+pub fn build_context(package_name: &str) -> Result<PackageContext, String> {
     use crate::shared::{aur_git, aur_rpc, cache};
 
     let metadata = aur_rpc::fetch_package_info(package_name)?;
@@ -143,7 +126,7 @@ pub fn build_context_prefetched(
     })
 }
 
-/// Scan a local PKGBUILD string without network access. Used for testing and --pkgbuild.
+/// Scan a local PKGBUILD string without network access.
 pub fn scan_pkgbuild(name: &str, pkgbuild_content: &str) -> ScanResult {
     let ctx = PackageContext {
         name: name.to_string(),

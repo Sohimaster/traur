@@ -105,10 +105,6 @@ static TOP_PACKAGES: LazyLock<Vec<String>> = LazyLock::new(|| {
 pub struct NameAnalysis;
 
 impl Feature for NameAnalysis {
-    fn name(&self) -> &str {
-        "name_analysis"
-    }
-
     fn analyze(&self, ctx: &PackageContext) -> Vec<Signal> {
         let mut signals = Vec::new();
         let name = &ctx.name;
@@ -129,6 +125,7 @@ impl Feature for NameAnalysis {
                             "Name '{name}' looks like impersonation of '{brand}' with suspicious suffix"
                         ),
                         is_override_gate: false,
+                        matched_line: None,
                     });
                     // Only fire once per package
                     return signals;
@@ -151,6 +148,7 @@ impl Feature for NameAnalysis {
                         "Name '{name}' is {dist} edit(s) away from popular package '{top}'"
                     ),
                     is_override_gate: false,
+                    matched_line: None,
                 });
                 break;
             }

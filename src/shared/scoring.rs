@@ -8,6 +8,8 @@ pub struct Signal {
     pub points: u32,
     pub description: String,
     pub is_override_gate: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub matched_line: Option<String>,
 }
 
 /// The four weighted signal categories.
@@ -140,6 +142,7 @@ mod tests {
             points,
             description: String::new(),
             is_override_gate: override_gate,
+            matched_line: None,
         }
     }
 

@@ -1,49 +1,108 @@
 //! traur-hook: ALPM pre-transaction hook binary.
 //! Reads package names from stdin (passed by pacman/paru via NeedsTargets),
-//! filters to AUR-only packages, runs traur scan on each, and exits non-zero
-//! if any package scores CRITICAL or higher.
+//! filters to AUR-only packages, scans each using the traur library directly,
+//! shows all results, and prompts the user before continuing.
 
-use std::io::{self, BufRead};
+use std::io::{self, BufRead, BufReader, Write};
 use std::process::Command;
+use traur::coordinator;
+use traur::shared::config::{self, is_whitelisted_in};
+use traur::shared::output;
+use traur::shared::scoring::Tier;
 
 fn main() {
+    // Collect all package names from stdin (ALPM NeedsTargets)
     let stdin = io::stdin();
-    let mut failed = false;
+    let packages: Vec<String> = stdin
+        .lock()
+        .lines()
+        .filter_map(|line| line.ok())
+        .map(|l| l.trim().to_string())
+        .filter(|l| !l.is_empty())
+        .collect();
 
-    for line in stdin.lock().lines() {
-        let Ok(pkg_name) = line else { continue };
-        let pkg_name = pkg_name.trim().to_string();
-        if pkg_name.is_empty() {
+    if packages.is_empty() {
+        return;
+    }
+
+    // Filter to AUR-only packages
+    let aur_packages: Vec<String> = packages
+        .into_iter()
+        .filter(|pkg| !is_in_official_repos(pkg))
+        .collect();
+
+    if aur_packages.is_empty() {
+        return;
+    }
+
+    let config = config::load_config();
+    let mut has_critical = false;
+    let mut any_scanned = false;
+
+    for pkg in &aur_packages {
+        if is_whitelisted_in(&config, pkg) {
+            eprintln!("traur: {pkg} (whitelisted, skipping scan)");
             continue;
         }
 
-        // Skip packages in official repos (core, extra, multilib)
-        if is_in_official_repos(&pkg_name) {
-            continue;
-        }
+        any_scanned = true;
 
-        // Run traur scan on AUR packages
-        let status = Command::new("traur")
-            .args(["scan", &pkg_name])
-            .status();
-
-        match status {
-            Ok(s) if !s.success() => {
-                eprintln!("traur: package '{pkg_name}' flagged as suspicious");
-                failed = true;
+        match coordinator::build_context(pkg) {
+            Ok(ctx) => {
+                let result = coordinator::run_analysis(&ctx);
+                output::print_text(&result, true);
+                if result.tier >= Tier::Critical {
+                    has_critical = true;
+                }
             }
             Err(e) => {
-                eprintln!("traur: failed to scan '{pkg_name}': {e}");
-                // Don't block on scan failures — fail open
+                eprintln!("traur: failed to scan '{pkg}': {e}");
+                // Fail open on scan errors
             }
-            _ => {}
         }
     }
 
-    if failed {
-        eprintln!("traur: aborting transaction due to suspicious packages");
+    if !any_scanned {
+        return; // All packages were whitelisted
+    }
+
+    if has_critical {
+        eprintln!();
+        eprintln!("traur: CRITICAL/MALICIOUS packages detected above");
         eprintln!("traur: use 'traur allow <package>' to whitelist, then retry");
         std::process::exit(1);
+    }
+
+    eprintln!();
+    eprint!("traur: Continue with installation? [y/N] ");
+    io::stderr().flush().ok();
+
+    let response = read_from_tty();
+    match response.trim().to_lowercase().as_str() {
+        "y" | "yes" => {} // proceed
+        _ => {
+            eprintln!("traur: aborting transaction");
+            std::process::exit(1);
+        }
+    }
+}
+
+/// Read a line from /dev/tty for interactive input (stdin is used by ALPM).
+fn read_from_tty() -> String {
+    let file = match std::fs::File::open("/dev/tty") {
+        Ok(f) => f,
+        Err(e) => {
+            eprintln!("traur: cannot open /dev/tty: {e}");
+            eprintln!("traur: aborting (non-interactive)");
+            std::process::exit(1);
+        }
+    };
+
+    let mut reader = BufReader::new(file);
+    let mut line = String::new();
+    match reader.read_line(&mut line) {
+        Ok(_) => line,
+        Err(_) => String::new(), // treated as "N"
     }
 }
 

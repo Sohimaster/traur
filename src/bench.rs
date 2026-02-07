@@ -185,7 +185,7 @@ pub fn run(count: usize, jobs: usize) -> i32 {
         println!("{}", format!("=== {} flagged packages (HIGH+) ===", flagged.len()).bold());
         for result in &flagged {
             println!();
-            output::print_text(result);
+            output::print_text(result, false);
         }
     }
 

@@ -88,13 +88,15 @@ pub fn read_git_log(repo_path: &std::path::Path, max_commits: usize) -> Vec<GitC
 
     let mut lines = stdout.lines().peekable();
     while lines.peek().is_some() {
-        let hash = match lines.next() {
-            Some(h) if !h.is_empty() => h.to_string(),
+        // hash
+        match lines.next() {
+            Some(h) if !h.is_empty() => {}
             _ => break,
         };
         let author = lines.next().unwrap_or("").to_string();
         let timestamp: u64 = lines.next().unwrap_or("0").parse().unwrap_or(0);
-        let message = lines.next().unwrap_or("").to_string();
+        // message
+        let _ = lines.next();
 
         // Skip the ---END--- delimiter
         while let Some(line) = lines.peek() {
@@ -106,10 +108,8 @@ pub fn read_git_log(repo_path: &std::path::Path, max_commits: usize) -> Vec<GitC
         }
 
         commits.push(GitCommit {
-            hash,
             author,
             timestamp,
-            message,
             diff: None,
         });
     }

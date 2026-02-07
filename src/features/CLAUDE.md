@@ -6,12 +6,13 @@ Each subdirectory is a self-contained analysis feature implementing the `Feature
 
 ```rust
 pub trait Feature {
-    fn name(&self) -> &str;
     fn analyze(&self, ctx: &PackageContext) -> Vec<Signal>;
 }
 ```
 
 Features receive a `PackageContext` (all collected data about a package) and return signals they detected. The coordinator runs all features and feeds signals to the scoring engine.
+
+Each signal should populate `matched_line: Option<String>` with the exact triggering line (trimmed) when applicable. For PKGBUILD/pattern-based features, find the matching line after regex match. For metadata/behavioral features, use `None`.
 
 ## Registered features
 

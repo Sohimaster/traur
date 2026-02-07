@@ -13,10 +13,6 @@ static SOURCE_ARRAY_RE: LazyLock<Regex> = LazyLock::new(|| {
 pub struct SourceUrlAnalysis;
 
 impl Feature for SourceUrlAnalysis {
-    fn name(&self) -> &str {
-        "source_url_analysis"
-    }
-
     fn analyze(&self, ctx: &PackageContext) -> Vec<Signal> {
         let Some(ref content) = ctx.pkgbuild_content else {
             return Vec::new();
@@ -33,12 +29,17 @@ impl Feature for SourceUrlAnalysis {
 
         for pat in compiled {
             if pat.regex.is_match(&source_content) {
+                let matched_line = source_content
+                    .lines()
+                    .find(|line| pat.regex.is_match(line))
+                    .map(|line| line.trim().to_string());
                 signals.push(Signal {
                     id: pat.id.clone(),
                     category: SignalCategory::Pkgbuild,
                     points: pat.points,
                     description: pat.description.clone(),
                     is_override_gate: pat.override_gate,
+                    matched_line,
                 });
             }
         }

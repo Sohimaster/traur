@@ -16,10 +16,6 @@ static NET_CONTENT_RE: LazyLock<Regex> = LazyLock::new(|| {
 pub struct GitHistoryAnalysis;
 
 impl Feature for GitHistoryAnalysis {
-    fn name(&self) -> &str {
-        "git_history_analysis"
-    }
-
     fn analyze(&self, ctx: &PackageContext) -> Vec<Signal> {
         let mut signals = Vec::new();
 
@@ -40,6 +36,7 @@ impl Feature for GitHistoryAnalysis {
                 points: 20,
                 description: "Git history has only 1 commit".to_string(),
                 is_override_gate: false,
+                matched_line: None,
             });
         }
 
@@ -61,6 +58,7 @@ impl Feature for GitHistoryAnalysis {
                         points: 25,
                         description: format!("Package is very new ({age_days} days old)"),
                         is_override_gate: false,
+                        matched_line: None,
                     });
                 }
             }
@@ -85,6 +83,7 @@ impl Feature for GitHistoryAnalysis {
                                 "Latest commit introduces network code not present in prior history"
                                     .to_string(),
                             is_override_gate: false,
+                            matched_line: None,
                         });
                     }
                 }
@@ -102,6 +101,7 @@ impl Feature for GitHistoryAnalysis {
                     points: 25,
                     description: "Git history shows multiple different authors".to_string(),
                     is_override_gate: false,
+                    matched_line: None,
                 });
             }
         }
@@ -121,10 +121,8 @@ mod tests {
 
     fn make_commit(author: &str, ts: u64, diff: Option<&str>) -> GitCommit {
         GitCommit {
-            hash: "abc123".into(),
             author: author.into(),
             timestamp: ts,
-            message: "update".into(),
             diff: diff.map(|s| s.to_string()),
         }
     }

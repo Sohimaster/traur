@@ -6,10 +6,6 @@ use std::time::{SystemTime, UNIX_EPOCH};
 pub struct MaintainerAnalysis;
 
 impl Feature for MaintainerAnalysis {
-    fn name(&self) -> &str {
-        "maintainer_analysis"
-    }
-
     fn analyze(&self, ctx: &PackageContext) -> Vec<Signal> {
         let mut signals = Vec::new();
 
@@ -36,6 +32,7 @@ impl Feature for MaintainerAnalysis {
                         "Maintainer has only 1 package, created {age_days} days ago"
                     ),
                     is_override_gate: false,
+                    matched_line: None,
                 });
             } else {
                 signals.push(Signal {
@@ -44,6 +41,7 @@ impl Feature for MaintainerAnalysis {
                     points: 15,
                     description: "Maintainer has only 1 package".to_string(),
                     is_override_gate: false,
+                    matched_line: None,
                 });
             }
         }
@@ -70,6 +68,7 @@ impl Feature for MaintainerAnalysis {
                             "Maintainer created {batch_count}+ packages within 48 hours"
                         ),
                         is_override_gate: false,
+                        matched_line: None,
                     });
                     break;
                 }
@@ -87,27 +86,15 @@ mod tests {
 
     fn make_pkg(name: &str, first_submitted: u64) -> AurPackage {
         AurPackage {
-            id: 1,
             name: name.into(),
             package_base: None,
-            version: "1.0".into(),
-            description: None,
             url: None,
             num_votes: 0,
             popularity: 0.0,
             out_of_date: None,
             maintainer: Some("testuser".into()),
             first_submitted,
-            last_modified: first_submitted,
-            depends: None,
-            make_depends: None,
-            opt_depends: None,
-            check_depends: None,
-            conflicts: None,
-            provides: None,
-            replaces: None,
             license: None,
-            keywords: None,
         }
     }
 

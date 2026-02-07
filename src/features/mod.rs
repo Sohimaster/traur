@@ -15,7 +15,6 @@ use crate::shared::scoring::Signal;
 /// Trait implemented by every analysis feature.
 /// Each feature receives a PackageContext and returns signals it detected.
 pub trait Feature {
-    fn name(&self) -> &str;
     fn analyze(&self, ctx: &PackageContext) -> Vec<Signal>;
 }
 
