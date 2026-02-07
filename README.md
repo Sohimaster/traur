@@ -29,16 +29,16 @@ traur bench               # benchmark 1000 latest AUR packages
 
 | Feature | What it checks |
 |---------|---------------|
-| PKGBUILD analysis | angerous shell code |
-| Install script analysis | suspicious .install hooks |
-| Source URL analysis | untrusted source domains |
+| PKGBUILD analysis | Dangerous shell code |
+| Install script analysis | Duspicious .install hooks |
+| Source URL analysis | Untrusted source domains |
 | Checksum analysis | Missing, skipped, or weak checksums |
 | Metadata analysis | AUR votes, popularity, maintainer status |
 | Name analysis | Typosquatting and brand impersonation |
 | Maintainer analysis | New accounts, batch uploads |
 | Git history analysis | New network code, author changes |
 | Shell analysis | Beyond-regex obfuscation (var concat, indirect exec, data blobs) |
-| GTFOBins analysis | legitimate binary abuse |
+| GTFOBins analysis | Legitimate binary abuse |
 
 Composite score 0-100, 5 tiers:
 
