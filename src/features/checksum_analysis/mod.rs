@@ -140,3 +140,62 @@ fn count_array_entries(content: &str, array_name: &str) -> usize {
     let body = &caps[1];
     TOKEN_RE.find_iter(body).count()
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn analyze(name: &str, content: &str) -> Vec<String> {
+        let ctx = PackageContext {
+            name: name.into(),
+            metadata: None,
+            pkgbuild_content: Some(content.into()),
+            install_script_content: None,
+            prior_pkgbuild_content: None,
+            git_log: vec![],
+            maintainer_packages: vec![],
+        };
+        ChecksumAnalysis.analyze(&ctx).iter().map(|s| s.id.clone()).collect()
+    }
+
+    fn has(ids: &[String], id: &str) -> bool {
+        ids.iter().any(|s| s == id)
+    }
+
+    #[test]
+    fn no_checksums() {
+        let ids = analyze("test-pkg", "pkgname=test\nsource=('https://example.com/a.tar.gz')\n");
+        assert!(has(&ids, "P-NO-CHECKSUMS"));
+    }
+
+    #[test]
+    fn skip_all() {
+        let ids = analyze("test-pkg", "pkgname=test\nsource=('https://example.com/a.tar.gz')\nsha256sums=('SKIP')\n");
+        assert!(has(&ids, "P-SKIP-ALL"));
+    }
+
+    #[test]
+    fn weak_checksums() {
+        let ids = analyze("test-pkg", "pkgname=test\nsource=('https://example.com/a.tar.gz')\nsha1sums=('da39a3ee5e6b4b0d3255bfef95601890afd80709')\n");
+        assert!(has(&ids, "P-WEAK-CHECKSUMS"));
+    }
+
+    #[test]
+    fn checksum_mismatch() {
+        let ids = analyze("test-pkg", "pkgname=test\nsource=('a.tar.gz' 'b.tar.gz')\nsha256sums=('abc123')\n");
+        assert!(has(&ids, "P-CHECKSUM-MISMATCH"));
+    }
+
+    #[test]
+    fn vcs_skip_not_flagged() {
+        let ids = analyze("tool-git", "pkgname=tool-git\nsource=('git+https://github.com/user/tool.git')\nsha256sums=('SKIP')\n");
+        assert!(!has(&ids, "P-SKIP-ALL"), "VCS package should not flag SKIP checksums");
+        assert!(!has(&ids, "P-NO-CHECKSUMS"), "VCS package should not flag missing checksums");
+    }
+
+    #[test]
+    fn strong_checksum_no_weak_flag() {
+        let ids = analyze("test-pkg", "pkgname=test\nsource=('a.tar.gz')\nsha256sums=('abc123')\n");
+        assert!(!has(&ids, "P-WEAK-CHECKSUMS"));
+    }
+}

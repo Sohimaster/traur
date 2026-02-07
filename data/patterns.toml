@@ -212,6 +212,172 @@ points = 60
 description = "Direct disk device read (data exfiltration)"
 override_gate = false
 
+# Cryptocurrency mining
+[[pkgbuild_analysis]]
+id = "P-MINER-BINARY"
+pattern = '(xmrig|cpuminer|minerd|ethminer|bfgminer|cgminer|nbminer|phoenixminer|lolminer|gminer|teamredminer)'
+points = 70
+description = "Reference to cryptocurrency mining software"
+override_gate = false
+
+[[pkgbuild_analysis]]
+id = "P-STRATUM-URL"
+pattern = 'stratum\+[a-z]+://'
+points = 85
+description = "Stratum mining protocol URL (cryptocurrency mining)"
+override_gate = false
+
+[[pkgbuild_analysis]]
+id = "P-MINING-POOL"
+pattern = '(pool\.minergate|nanopool\.org|2miners\.com|f2pool\.com|ethermine\.org|nicehash\.com|miningpoolhub\.com|unmineable\.com|hashvault\.pro|moneroocean\.stream)'
+points = 80
+description = "Known cryptocurrency mining pool domain"
+override_gate = false
+
+[[pkgbuild_analysis]]
+id = "P-CRYPTO-WALLET"
+pattern = '(4[0-9AB][1-9A-HJ-NP-Za-km-z]{93}|bc1[a-zA-HJ-NP-Z0-9]{39,59}|0x[0-9a-fA-F]{40})'
+points = 75
+description = "Cryptocurrency wallet address (Monero/Bitcoin/Ethereum)"
+override_gate = false
+
+# Python remote code execution
+[[pkgbuild_analysis]]
+id = "P-PYTHON-EXEC-URL"
+pattern = 'exec\s*\(\s*(urlopen|requests\.get|urllib)'
+points = 90
+description = "Python fetch-and-execute (exec with URL fetch)"
+override_gate = true
+
+[[pkgbuild_analysis]]
+id = "P-PYTHON-DYNAMIC-IMPORT"
+pattern = "__import__\\s*\\(\\s*['\"]os['\"]\\s*\\)\\s*\\.\\s*system"
+points = 65
+description = "Python dynamic import to execute system commands"
+override_gate = false
+
+[[pkgbuild_analysis]]
+id = "P-PYTHON-EXEC-COMPOUND"
+pattern = 'python[23]?\s+.*-c\s+.*exec\s*\('
+points = 80
+description = "Python one-liner with exec() (obfuscated code execution)"
+override_gate = false
+
+# Download-chmod-execute chains
+[[pkgbuild_analysis]]
+id = "P-CHMOD-EXEC-CHAIN"
+pattern = 'chmod\s+\+x\s+\S+\s*[;&|]+\s*\./'
+points = 75
+description = "chmod +x followed by execution (download-chmod-execute chain)"
+override_gate = false
+
+[[pkgbuild_analysis]]
+id = "P-WGET-CHMOD-EXEC"
+pattern = '(curl|wget)\s[^;&|]*\S+\s*[;&|]+\s*chmod\s+\+x'
+points = 85
+description = "Download followed by chmod +x (download-and-execute preparation)"
+override_gate = false
+
+# /tmp staging
+[[pkgbuild_analysis]]
+id = "P-TMP-EXECUTION"
+pattern = '(chmod\s+\+x\s+/tmp/|>\s*/tmp/\S+\s*[;&|]+\s*(ba)?sh\s+/tmp/)'
+points = 70
+description = "Writing or executing files in /tmp (common malware staging)"
+override_gate = false
+
+# Process backgrounding/hiding
+[[pkgbuild_analysis]]
+id = "P-NOHUP-BACKGROUND"
+pattern = 'nohup\s+\S+.*&'
+points = 55
+description = "nohup with backgrounding (persistent hidden process)"
+override_gate = false
+
+[[pkgbuild_analysis]]
+id = "P-DEVNULL-BACKGROUND"
+pattern = '(curl|wget|python[23]?|bash|sh)\s+.*>/dev/null.*&'
+points = 65
+description = "Network/shell command backgrounded with suppressed output"
+override_gate = false
+
+# System reconnaissance
+[[pkgbuild_analysis]]
+id = "P-SYSINFO-RECON"
+pattern = '(uname\s+-a|cat\s+/proc/cpuinfo|lspci|ip\s+addr|hostname\s+-[fI]|cat\s+/etc/machine-id|dmidecode)'
+points = 40
+description = "System information gathering (reconnaissance)"
+override_gate = false
+
+# Hex/octal obfuscation
+[[pkgbuild_analysis]]
+id = "P-PRINTF-HEX"
+pattern = 'printf\s+.*(\\x[0-9a-fA-F]{2}){4,}'
+points = 60
+description = "printf with hex escape sequences (obfuscated payload)"
+override_gate = false
+
+[[pkgbuild_analysis]]
+id = "P-XXD-DECODE"
+pattern = 'xxd\s+(-r|-revert)'
+points = 55
+description = "xxd reverse (hex to binary decode, possible payload)"
+override_gate = false
+
+# Kernel module / rootkit
+[[pkgbuild_analysis]]
+id = "P-KERNEL-MODULE-LOAD"
+pattern = '(insmod|modprobe)\s+[^-]'
+points = 50
+description = "Kernel module loading (potential rootkit)"
+override_gate = false
+
+[[pkgbuild_analysis]]
+id = "P-KERNEL-MODULE-WRITE"
+pattern = '/lib/modules/|/etc/modules-load\.d/'
+points = 45
+description = "Writing to kernel module directories"
+override_gate = false
+
+# Pastebin URLs in PKGBUILD body (not just source array)
+[[pkgbuild_analysis]]
+id = "P-PASTEBIN-CODE"
+pattern = '(curl|wget)\s+[^;|&]*(pastebin\.com|paste\.ee|hastebin\.com|ptpb\.pw|ix\.io|dpaste\.com|ghostbin\.com|rentry\.co|termbin\.com)'
+points = 75
+description = "Downloading from paste service in build/package code (mutable untrusted source)"
+override_gate = false
+
+# DNS/HTTP exfiltration
+[[pkgbuild_analysis]]
+id = "P-DNS-EXFIL"
+pattern = '(dig|nslookup|host)\s+\$'
+points = 60
+description = "DNS lookup with variable interpolation (possible DNS exfiltration)"
+override_gate = false
+
+[[pkgbuild_analysis]]
+id = "P-CURL-POST-DATA"
+pattern = 'curl\s+[^;|&]*(-d\s+\$|--data[^;|&]*\$|-X\s+POST[^;|&]*\$)'
+points = 55
+description = "curl POST with variable data (possible data exfiltration)"
+override_gate = false
+
+# Archive extract-and-execute
+[[pkgbuild_analysis]]
+id = "P-ARCHIVE-EXEC"
+pattern = '(tar\s+[^;|&]*-?x[^;|&]*|unzip\s+[^;|&]*)[;&|]+\s*(\./|chmod\s+\+x)'
+points = 55
+description = "Archive extraction followed by execution (extract-and-execute chain)"
+override_gate = false
+
+# Environment variable theft
+[[pkgbuild_analysis]]
+id = "P-ENV-TOKEN-ACCESS"
+pattern = '\$(AWS_SECRET_ACCESS_KEY|AWS_ACCESS_KEY_ID|GITHUB_TOKEN|GH_TOKEN|GITLAB_TOKEN|NPM_TOKEN|DOCKER_PASSWORD|API_KEY|SECRET_KEY|PRIVATE_KEY|DATABASE_URL|SLACK_TOKEN|DISCORD_TOKEN)'
+points = 55
+description = "Accessing sensitive environment variables (token/credential theft)"
+override_gate = false
+
 # Install script patterns
 [[install_script_analysis]]
 id = "P-INSTALL-CURL"
@@ -290,6 +456,62 @@ points = 55
 description = "Dynamic code execution via eval in install script"
 override_gate = false
 
+[[install_script_analysis]]
+id = "P-INSTALL-NOHUP"
+pattern = 'nohup\s+\S+.*&'
+points = 75
+description = "nohup with backgrounding in install script (persistent hidden process)"
+override_gate = false
+
+[[install_script_analysis]]
+id = "P-INSTALL-TMP-EXEC"
+pattern = '(chmod\s+\+x\s+/tmp/|>\s*/tmp/\S+\s*[;&|]+\s*(ba)?sh\s+/tmp/)'
+points = 80
+description = "Executing from /tmp in install script"
+override_gate = false
+
+[[install_script_analysis]]
+id = "P-INSTALL-CHMOD-EXEC"
+pattern = 'chmod\s+\+x\s+\S+\s*[;&|]+\s*\./'
+points = 80
+description = "chmod +x followed by execution in install script"
+override_gate = false
+
+[[install_script_analysis]]
+id = "P-INSTALL-PYTHON-EXEC"
+pattern = 'exec\s*\(\s*(urlopen|requests\.get|urllib)'
+points = 90
+description = "Python fetch-and-execute in install script"
+override_gate = true
+
+[[install_script_analysis]]
+id = "P-INSTALL-DEVNULL-BG"
+pattern = '(curl|wget|python[23]?|bash|sh)\s+.*>/dev/null.*&'
+points = 75
+description = "Network/shell command backgrounded with suppressed output in install script"
+override_gate = false
+
+[[install_script_analysis]]
+id = "P-INSTALL-MINER"
+pattern = '(xmrig|cpuminer|minerd|ethminer|stratum\+[a-z]+://)'
+points = 85
+description = "Cryptocurrency mining references in install script"
+override_gate = false
+
+[[install_script_analysis]]
+id = "P-INSTALL-KERNEL-MOD"
+pattern = '(insmod|modprobe)\s+[^-]'
+points = 70
+description = "Kernel module loading in install script"
+override_gate = false
+
+[[install_script_analysis]]
+id = "P-INSTALL-ENV-TOKENS"
+pattern = '\$(AWS_SECRET_ACCESS_KEY|AWS_ACCESS_KEY_ID|GITHUB_TOKEN|GH_TOKEN|GITLAB_TOKEN|NPM_TOKEN|DOCKER_PASSWORD|API_KEY|SECRET_KEY|PRIVATE_KEY|SLACK_TOKEN|DISCORD_TOKEN)'
+points = 65
+description = "Accessing sensitive environment variables in install script"
+override_gate = false
+
 # Source URL patterns
 [[source_url_analysis]]
 id = "P-RAW-IP-URL"
@@ -345,4 +567,25 @@ id = "P-HTTP-SOURCE"
 pattern = 'http://[^$\s]'
 points = 15
 description = "Plain HTTP source URL (no TLS, MITM risk)"
+override_gate = false
+
+[[source_url_analysis]]
+id = "P-FILEHOST-SOURCE"
+pattern = '(anonfiles\.com|file\.io|transfer\.sh|tmpfiles\.org|gofile\.io|pixeldrain\.com|mediafire\.com)'
+points = 45
+description = "Source from ephemeral/anonymous file hosting (untrusted, mutable content)"
+override_gate = false
+
+[[source_url_analysis]]
+id = "P-ONION-SOURCE"
+pattern = '\.onion[/:]'
+points = 65
+description = "Source URL points to Tor hidden service"
+override_gate = false
+
+[[source_url_analysis]]
+id = "P-MEGA-SOURCE"
+pattern = '(mega\.nz|mega\.co\.nz)/'
+points = 40
+description = "Source from MEGA file hosting (encrypted, unverifiable)"
 override_gate = false

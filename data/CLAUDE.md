@@ -22,6 +22,12 @@ override_gate = true  # optional, default false
 - `override_gate = true` means this signal bypasses weighted scoring and escalates directly to MALICIOUS tier
 - Patterns are compiled once via `OnceLock` and reused
 
+### Pattern categories
+
+- **pkgbuild_analysis** (48 patterns): download-and-execute, reverse shells, obfuscation, credential theft, persistence, privilege escalation, C2/exfiltration, crypto mining, Python RCE, download-chmod-execute, /tmp staging, process hiding, system recon, hex obfuscation, kernel modules, pastebin in code, DNS exfil, env variable theft
+- **install_script_analysis** (20 patterns): curl/wget in install, pipe to shell, persistence, credential access, base64, eval, nohup, /tmp exec, chmod+exec, Python RCE, output suppression, crypto mining, kernel modules, env tokens
+- **source_url_analysis** (11 patterns): raw IP, URL shortener, Discord webhook, pastebin, dynamic DNS, Telegram bot, tunnel service, HTTP source, ephemeral file hosting, Tor hidden service, MEGA
+
 ### Adding a new pattern
 
 1. Add a `[[section_name]]` entry to patterns.toml

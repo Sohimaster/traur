@@ -159,3 +159,50 @@ impl Feature for NameAnalysis {
         signals
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn analyze(name: &str) -> Vec<String> {
+        let ctx = PackageContext {
+            name: name.into(),
+            metadata: None,
+            pkgbuild_content: None,
+            install_script_content: None,
+            prior_pkgbuild_content: None,
+            git_log: vec![],
+            maintainer_packages: vec![],
+        };
+        NameAnalysis.analyze(&ctx).iter().map(|s| s.id.clone()).collect()
+    }
+
+    fn has(ids: &[String], id: &str) -> bool {
+        ids.iter().any(|s| s == id)
+    }
+
+    #[test]
+    fn impersonate_suffix() {
+        assert!(has(&analyze("firefox-fix"), "B-NAME-IMPERSONATE"));
+        assert!(has(&analyze("discord-cracked-bin"), "B-NAME-IMPERSONATE"));
+        assert!(has(&analyze("librewolf-patched-bin"), "B-NAME-IMPERSONATE"));
+    }
+
+    #[test]
+    fn typosquat() {
+        assert!(has(&analyze("yya"), "B-TYPOSQUAT")); // 2 edits from "yay"
+        assert!(has(&analyze("pary"), "B-TYPOSQUAT")); // 1 edit from "paru"
+    }
+
+    #[test]
+    fn exact_match_no_typosquat() {
+        assert!(!has(&analyze("yay"), "B-TYPOSQUAT"), "Exact match should not flag");
+        assert!(!has(&analyze("firefox"), "B-TYPOSQUAT"));
+    }
+
+    #[test]
+    fn normal_name_no_signals() {
+        let ids = analyze("my-custom-tool");
+        assert!(ids.is_empty(), "Normal name should trigger no signals, got: {ids:?}");
+    }
+}

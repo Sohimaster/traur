@@ -79,3 +79,98 @@ impl Feature for MaintainerAnalysis {
         signals
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::shared::models::AurPackage;
+
+    fn make_pkg(name: &str, first_submitted: u64) -> AurPackage {
+        AurPackage {
+            id: 1,
+            name: name.into(),
+            package_base: None,
+            version: "1.0".into(),
+            description: None,
+            url: None,
+            num_votes: 0,
+            popularity: 0.0,
+            out_of_date: None,
+            maintainer: Some("testuser".into()),
+            first_submitted,
+            last_modified: first_submitted,
+            depends: None,
+            make_depends: None,
+            opt_depends: None,
+            check_depends: None,
+            conflicts: None,
+            provides: None,
+            replaces: None,
+            license: None,
+            keywords: None,
+        }
+    }
+
+    fn now() -> u64 {
+        SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_secs()
+    }
+
+    fn has(ids: &[String], id: &str) -> bool {
+        ids.iter().any(|s| s == id)
+    }
+
+    #[test]
+    fn maintainer_new() {
+        let ts = now();
+        let pkg = make_pkg("evil", ts - 86400); // 1 day old
+        let ctx = PackageContext {
+            name: "evil".into(),
+            metadata: Some(pkg.clone()),
+            pkgbuild_content: None,
+            install_script_content: None,
+            prior_pkgbuild_content: None,
+            git_log: vec![],
+            maintainer_packages: vec![pkg],
+        };
+        let ids: Vec<String> = MaintainerAnalysis.analyze(&ctx).iter().map(|s| s.id.clone()).collect();
+        assert!(has(&ids, "B-MAINTAINER-NEW"));
+    }
+
+    #[test]
+    fn maintainer_single() {
+        let ts = now();
+        let pkg = make_pkg("old-pkg", ts - 90 * 86400); // 90 days old
+        let ctx = PackageContext {
+            name: "old-pkg".into(),
+            metadata: Some(pkg.clone()),
+            pkgbuild_content: None,
+            install_script_content: None,
+            prior_pkgbuild_content: None,
+            git_log: vec![],
+            maintainer_packages: vec![pkg],
+        };
+        let ids: Vec<String> = MaintainerAnalysis.analyze(&ctx).iter().map(|s| s.id.clone()).collect();
+        assert!(has(&ids, "B-MAINTAINER-SINGLE"));
+    }
+
+    #[test]
+    fn maintainer_batch() {
+        let ts = now();
+        let pkgs = vec![
+            make_pkg("pkg1", ts - 3600),
+            make_pkg("pkg2", ts - 7200),
+            make_pkg("pkg3", ts - 10800),
+        ];
+        let ctx = PackageContext {
+            name: "pkg1".into(),
+            metadata: Some(pkgs[0].clone()),
+            pkgbuild_content: None,
+            install_script_content: None,
+            prior_pkgbuild_content: None,
+            git_log: vec![],
+            maintainer_packages: pkgs,
+        };
+        let ids: Vec<String> = MaintainerAnalysis.analyze(&ctx).iter().map(|s| s.id.clone()).collect();
+        assert!(has(&ids, "B-MAINTAINER-BATCH"));
+    }
+}

@@ -2,8 +2,8 @@
 
 ## Strategy
 
-- **Feature tests** (`feature_tests.rs`): Unit tests per feature using fixture PKGBUILDs
-- **Integration tests** (`integration_tests.rs`): End-to-end scan tests that verify full pipeline
+- **Unit tests** (`src/features/*/mod.rs`): Each feature has `#[cfg(test)] mod tests` that tests every signal it emits in isolation. Tests construct a `PackageContext` directly, call `feature.analyze()`, and assert on signal IDs.
+- **Integration tests** (`tests/feature_tests.rs`): Full-pipeline tests using `scan_pkgbuild()` that verify coordinator + scoring + tier assignment across multiple features.
 
 ## Fixtures
 
@@ -18,6 +18,6 @@ cargo test
 
 ## Adding test cases
 
-1. Place a PKGBUILD file in `fixtures/malicious/` or `fixtures/benign/`
-2. Name it descriptively (e.g., `curl_pipe_bash.PKGBUILD`, `firefox_normal.PKGBUILD`)
-3. Write a test that loads the fixture and asserts expected signals/tier
+For a new **pattern**: Add a unit test in the relevant feature's `#[cfg(test)] mod tests` (e.g., `src/features/pkgbuild_analysis/mod.rs`).
+
+For a new **integration scenario**: Add a fixture PKGBUILD in `fixtures/malicious/` or `fixtures/benign/`, then add a test in `tests/feature_tests.rs` that verifies tier/scoring behavior.
