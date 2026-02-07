@@ -15,7 +15,7 @@ struct Cli {
 
 #[derive(Subcommand)]
 enum Commands {
-    /// Scan a package for security issues
+    /// Scan a package (or all installed AUR packages if none specified)
     Scan {
         /// Package name to scan (or --pkgbuild for local)
         package: Option<String>,
@@ -24,9 +24,13 @@ enum Commands {
         #[arg(long)]
         pkgbuild: Option<String>,
 
-        /// Scan all installed AUR packages
+        /// Scan all installed AUR packages (default when no package given)
         #[arg(long)]
         all_installed: bool,
+
+        /// Number of concurrent scan threads (for bulk scanning)
+        #[arg(long, default_value_t = 4)]
+        jobs: usize,
 
         /// Output as JSON
         #[arg(long)]
@@ -66,8 +70,9 @@ fn main() {
             package,
             pkgbuild,
             all_installed,
+            jobs,
             json,
-        } => cmd_scan(package, pkgbuild, all_installed, json),
+        } => cmd_scan(package, pkgbuild, all_installed, jobs, json),
         Commands::Report { package, json } => cmd_report(&package, json),
         Commands::Allow { package } => cmd_allow(&package),
         Commands::Bench { count, jobs } => bench::run(count, jobs),
@@ -79,32 +84,30 @@ fn main() {
 fn cmd_scan(
     package: Option<String>,
     pkgbuild: Option<String>,
-    all_installed: bool,
+    _all_installed: bool,
+    jobs: usize,
     json: bool,
 ) -> i32 {
-    if all_installed {
-        eprintln!("Scanning all installed AUR packages...");
-        // TODO: enumerate installed AUR packages
-        return 0;
-    }
-
     if let Some(path) = pkgbuild {
         eprintln!("Scanning local PKGBUILD at {path}...");
         // TODO: local PKGBUILD scan
         return 0;
     }
 
-    let Some(pkg) = package else {
-        eprintln!("Error: provide a package name, --pkgbuild path, or --all-installed");
-        return 1;
-    };
+    if let Some(pkg) = package {
+        return cmd_scan_single(&pkg, json);
+    }
 
-    match coordinator::scan_package(&pkg, json) {
+    // No package, no pkgbuild -> scan all installed AUR packages
+    cmd_scan_all_installed(jobs, json)
+}
+
+fn cmd_scan_single(pkg: &str, json: bool) -> i32 {
+    match coordinator::scan_package(pkg, json) {
         Ok(tier) => {
             use shared::scoring::Tier;
             match tier {
-                Tier::Low | Tier::Medium => 0,
-                Tier::High => 0,
+                Tier::Low | Tier::Medium | Tier::High => 0,
                 Tier::Critical | Tier::Malicious => 1,
             }
         }
@@ -113,6 +116,172 @@ fn cmd_scan(
             1
         }
     }
+}
+
+fn cmd_scan_all_installed(jobs: usize, json: bool) -> i32 {
+    use crate::shared::bulk::{batch_fetch_metadata, clone_with_retry, prefetch_maintainer_packages};
+    use crate::shared::scoring::{ScanResult, Tier};
+    use colored::Colorize;
+    use indicatif::{ProgressBar, ProgressStyle};
+    use rayon::prelude::*;
+    use std::sync::atomic::{AtomicU64, Ordering};
+
+    let names = match get_installed_aur_packages() {
+        Ok(names) if names.is_empty() => {
+            eprintln!("No AUR packages installed.");
+            return 0;
+        }
+        Ok(names) => names,
+        Err(e) => {
+            eprintln!("Error: {e}");
+            return 1;
+        }
+    };
+
+    let total = names.len();
+    eprintln!(
+        "{}",
+        format!("Scanning {} installed AUR packages...", total).bold()
+    );
+
+    eprintln!("  Fetching package metadata...");
+    let metadata = batch_fetch_metadata(&names);
+    eprintln!("  Got metadata for {}/{} packages", metadata.len(), total);
+
+    let maintainer_packages = prefetch_maintainer_packages(&metadata);
+
+    let pool = rayon::ThreadPoolBuilder::new()
+        .num_threads(jobs)
+        .build()
+        .expect("Failed to build thread pool");
+
+    let pb = ProgressBar::new(total as u64);
+    pb.set_style(
+        ProgressStyle::default_bar()
+            .template("[{elapsed_precise}] {bar:40.cyan/blue} {pos}/{len} ({per_sec})")
+            .unwrap()
+            .progress_chars("##-"),
+    );
+
+    let tier_counts: [AtomicU64; 5] = std::array::from_fn(|_| AtomicU64::new(0));
+    let error_count = AtomicU64::new(0);
+    let flagged = std::sync::Mutex::new(Vec::<ScanResult>::new());
+
+    pool.install(|| {
+        names.par_iter().for_each(|name| {
+            let result = if let Some(meta) = metadata.get(name).cloned() {
+                let maint_pkgs = meta
+                    .maintainer
+                    .as_deref()
+                    .and_then(|m| maintainer_packages.get(m))
+                    .cloned()
+                    .unwrap_or_default();
+
+                match clone_with_retry(name, meta, maint_pkgs) {
+                    Ok(ctx) => Ok(coordinator::run_analysis(&ctx)),
+                    Err(e) => Err(e),
+                }
+            } else {
+                Err("not found on AUR".to_string())
+            };
+
+            match result {
+                Ok(scan) => {
+                    let idx = match scan.tier {
+                        Tier::Low => 0,
+                        Tier::Medium => 1,
+                        Tier::High => 2,
+                        Tier::Critical => 3,
+                        Tier::Malicious => 4,
+                    };
+                    tier_counts[idx].fetch_add(1, Ordering::Relaxed);
+
+                    if scan.tier >= Tier::High {
+                        flagged.lock().unwrap().push(scan);
+                    }
+                }
+                Err(_) => {
+                    error_count.fetch_add(1, Ordering::Relaxed);
+                }
+            }
+
+            pb.inc(1);
+        });
+    });
+
+    pb.finish_and_clear();
+
+    let mut flagged = flagged.into_inner().unwrap();
+    let errors = error_count.load(Ordering::Relaxed) as usize;
+    let scanned = total - errors;
+
+    if json {
+        flagged.sort_by(|a, b| b.score.cmp(&a.score));
+        let json_str = serde_json::to_string_pretty(&flagged).expect("Failed to serialize");
+        println!("{json_str}");
+    } else {
+        println!();
+        println!("{}", "=== traur scan results ===".bold());
+        println!("  Scanned: {} packages ({} errors)", scanned, errors);
+        println!(
+            "  LOW: {}  MEDIUM: {}  HIGH: {}  CRITICAL: {}  MALICIOUS: {}",
+            tier_counts[0].load(Ordering::Relaxed),
+            tier_counts[1].load(Ordering::Relaxed),
+            tier_counts[2].load(Ordering::Relaxed),
+            tier_counts[3].load(Ordering::Relaxed),
+            tier_counts[4].load(Ordering::Relaxed),
+        );
+
+        if !flagged.is_empty() {
+            flagged.sort_by(|a, b| b.score.cmp(&a.score));
+            println!();
+            println!(
+                "{}",
+                format!("=== {} flagged packages (HIGH+) ===", flagged.len()).bold()
+            );
+            for result in &flagged {
+                println!();
+                shared::output::print_text(result);
+            }
+        } else {
+            println!();
+            println!("{}", "All packages look clean.".green());
+        }
+    }
+
+    let has_critical = tier_counts[3].load(Ordering::Relaxed) > 0
+        || tier_counts[4].load(Ordering::Relaxed) > 0;
+    if has_critical { 1 } else { 0 }
+}
+
+/// Get list of installed AUR (foreign) package names via `pacman -Qm`.
+fn get_installed_aur_packages() -> Result<Vec<String>, String> {
+    use std::process::Command;
+
+    let output = Command::new("pacman")
+        .args(["-Qm"])
+        .output()
+        .map_err(|e| format!("Failed to run pacman: {e}"))?;
+
+    if !output.status.success() {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        return Err(format!("pacman -Qm failed: {stderr}"));
+    }
+
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let names: Vec<String> = stdout
+        .lines()
+        .filter_map(|line| {
+            let name = line.split_whitespace().next()?;
+            if name.is_empty() {
+                None
+            } else {
+                Some(name.to_string())
+            }
+        })
+        .collect();
+
+    Ok(names)
 }
 
 fn cmd_report(package: &str, json: bool) -> i32 {

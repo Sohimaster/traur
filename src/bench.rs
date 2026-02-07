@@ -1,20 +1,19 @@
 use crate::coordinator;
-use crate::shared::aur_rpc;
-use crate::shared::models::{AurPackage, MetaDumpPackage};
+use crate::shared::bulk::{
+    batch_fetch_metadata, clone_with_retry, prefetch_maintainer_packages, RPC_BATCH_SIZE,
+};
+use crate::shared::models::MetaDumpPackage;
 use crate::shared::output;
 use crate::shared::scoring::{ScanResult, Tier};
 use colored::Colorize;
 use indicatif::{ProgressBar, ProgressStyle};
 use rayon::prelude::*;
-use std::collections::{HashMap, HashSet};
+use std::collections::HashSet;
 use std::io::Read;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::{Duration, Instant};
 
 const META_DUMP_URL: &str = "https://aur.archlinux.org/packages-meta-v1.json.gz";
-const RPC_BATCH_SIZE: usize = 150;
-const MAX_RETRIES: u32 = 3;
-const RETRY_BASE_DELAY: Duration = Duration::from_secs(2);
 
 struct BenchStats {
     total: usize,
@@ -51,66 +50,6 @@ fn fetch_recent_packages(count: usize) -> Result<Vec<MetaDumpPackage>, String> {
 
     packages.truncate(count);
     Ok(packages)
-}
-
-fn batch_fetch_metadata(names: &[String]) -> HashMap<String, AurPackage> {
-    let mut map = HashMap::new();
-
-    for chunk in names.chunks(RPC_BATCH_SIZE) {
-        let refs: Vec<&str> = chunk.iter().map(|s| s.as_str()).collect();
-        match aur_rpc::fetch_packages_info(&refs) {
-            Ok(packages) => {
-                for pkg in packages {
-                    map.insert(pkg.name.clone(), pkg);
-                }
-            }
-            Err(e) => {
-                eprintln!("  Warning: batch metadata fetch failed: {e}");
-            }
-        }
-    }
-
-    map
-}
-
-fn prefetch_maintainer_packages(metadata: &HashMap<String, AurPackage>) -> HashMap<String, Vec<AurPackage>> {
-    let maintainers: Vec<&str> = metadata
-        .values()
-        .filter_map(|pkg| pkg.maintainer.as_deref())
-        .collect::<HashSet<&str>>()
-        .into_iter()
-        .collect();
-
-    eprintln!("  Fetching maintainer data for {} unique maintainers...", maintainers.len());
-
-    maintainers
-        .par_iter()
-        .filter_map(|m| {
-            aur_rpc::fetch_maintainer_packages(m)
-                .ok()
-                .map(|pkgs| (m.to_string(), pkgs))
-        })
-        .collect()
-}
-
-/// Clone repo with retry + exponential backoff. Returns PackageContext or error.
-fn clone_with_retry(
-    name: &str,
-    metadata: AurPackage,
-    maintainer_packages: Vec<AurPackage>,
-) -> Result<crate::shared::models::PackageContext, String> {
-    for attempt in 0..MAX_RETRIES {
-        match coordinator::build_context_prefetched(name, metadata.clone(), maintainer_packages.clone()) {
-            Ok(ctx) => return Ok(ctx),
-            Err(e) if attempt + 1 < MAX_RETRIES => {
-                let delay = RETRY_BASE_DELAY * 2u32.pow(attempt);
-                std::thread::sleep(delay);
-                continue;
-            }
-            Err(e) => return Err(e),
-        }
-    }
-    unreachable!()
 }
 
 pub fn run(count: usize, jobs: usize) -> i32 {

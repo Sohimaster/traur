@@ -26,6 +26,7 @@ Features receive a `PackageContext` (all collected data about a package) and ret
 | `maintainer_analysis` | Maintainer reputation signals | Behavioral | 0.25 |
 | `git_history_analysis` | Temporal signals from git history | Temporal | 0.15 |
 | `shell_analysis` | Beyond-regex obfuscation (var concat, indirect exec, char-by-char, data blobs, binary download) | Pkgbuild | 0.45 |
+| `gtfobins_analysis` | GTFOBins-derived patterns (reverse shells, pipe-to-interpreter, non-obvious exec) | Pkgbuild | 0.45 |
 
 ## Adding a new feature
 

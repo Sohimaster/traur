@@ -4,7 +4,7 @@ External configuration files loaded at compile time or runtime.
 
 ## patterns.toml
 
-Regex pattern database used by pattern-based features (pkgbuild_analysis, install_script_analysis, source_url_analysis).
+Regex pattern database used by pattern-based features (pkgbuild_analysis, install_script_analysis, source_url_analysis, gtfobins_analysis).
 
 ### Format
 
@@ -24,9 +24,10 @@ override_gate = true  # optional, default false
 
 ### Pattern categories
 
-- **pkgbuild_analysis** (80 patterns): download-and-execute, reverse shells (bash/python/perl/ruby/awk/lua/php/nc/socat), shell obfuscation ($IFS, ANSI-C hex, ROT13, octal, string reversal), encoding bypasses (base64/base32/xxd/openssl), credential theft, persistence (systemd/cron/XDG autostart/udev/at jobs/PROMPT_COMMAND/.bash_logout), privilege escalation (SUID/sudoers/polkit/capabilities), anti-forensics (history/log clearing), C2/exfiltration, crypto mining, download-chmod-execute, /tmp staging, process hiding, system recon, kernel modules, pacman hooks, alias overrides
-- **install_script_analysis** (28 patterns): curl/wget in install, pipe to shell, persistence, credential access, obfuscation ($IFS, ANSI-C hex, ROT13), base64, eval, nohup, /tmp exec, chmod+exec, Python RCE, output suppression, crypto mining, kernel modules, env tokens, anti-forensics (history/log clearing), sudoers modification, PROMPT_COMMAND injection, XDG autostart
+- **pkgbuild_analysis** (84 patterns): download-and-execute, reverse shells (bash/python/perl/ruby/awk/lua/php/nc/socat), shell obfuscation ($IFS, ANSI-C hex, ROT13, octal, string reversal), encoding bypasses (base64/base32/xxd/openssl), credential theft, persistence (systemd/cron/XDG autostart/udev/at jobs/PROMPT_COMMAND/.bash_logout), privilege escalation (SUID/sudoers/polkit/capabilities), anti-forensics (history/log clearing), C2/exfiltration, crypto mining, download-chmod-execute, /tmp staging, process hiding, system recon, kernel modules, pacman hooks, alias overrides
+- **install_script_analysis** (27 patterns): curl/wget in install, pipe to shell, persistence, credential access, obfuscation ($IFS, ANSI-C hex, ROT13), base64, eval, nohup, /tmp exec, chmod+exec, Python RCE, output suppression, crypto mining, kernel modules, env tokens, anti-forensics (history/log clearing), sudoers modification, PROMPT_COMMAND injection, XDG autostart
 - **source_url_analysis** (11 patterns): raw IP, URL shortener, Discord webhook, pastebin, dynamic DNS, Telegram bot, tunnel service, HTTP source, ephemeral file hosting, Tor hidden service, MEGA
+- **gtfobins_analysis** (117 patterns): reverse/bind shells via Node.js/Julia/Tcl/Java/Go/OpenSSL, pipe-to-interpreter (node/ruby/php/lua/tclsh/R/julia/awk/jjs/ksh/csh/zsh/fish/dash), tar checkpoint, zip -TT, vim shell escape, gdb batch, expect spawn, nsenter, capsh, unshare, nmap, SSH ProxyCommand, pkexec, docker/podman, systemd-run, strace, screen, tmux, find/xargs/sed/cpio, cmake, psql, dotnet, tcpdump, nano, ed, m4, ip netns, gcc wrapper
 
 ### Adding a new pattern
 
