@@ -19,6 +19,7 @@ sudo install -Dm644 hook/traur.hook /usr/share/libalpm/hooks/traur.hook
 traur scan <package>      # scan a package
 traur report <package>    # detailed signal breakdown
 traur allow <package>     # whitelist a package
+traur bench               # benchmark 1000 latest AUR packages
 ```
 
 ## How it works
@@ -27,8 +28,8 @@ Each package is analyzed by 8 independent features that emit scored signals:
 
 | Feature | What it checks |
 |---------|---------------|
-| PKGBUILD analysis | 48 regex patterns for dangerous shell code |
-| Install script analysis | 20 patterns for suspicious .install hooks |
+| PKGBUILD analysis | 52 regex patterns for dangerous shell code |
+| Install script analysis | 19 patterns for suspicious .install hooks |
 | Source URL analysis | 11 patterns for sketchy source domains |
 | Checksum analysis | Missing, skipped, or weak checksums |
 | Metadata analysis | AUR votes, popularity, maintainer status |
@@ -52,6 +53,16 @@ Patterns are derived from real AUR malware incidents:
 - **Acroread (2018)** — orphan takeover, curl from paste service, systemd persistence
 
 Categories: download-and-execute, reverse shells, credential theft, persistence mechanisms, privilege escalation, C2/exfiltration, cryptocurrency mining, code obfuscation, kernel module loading, environment variable theft, system reconnaissance.
+
+## Benchmark
+
+```bash
+traur bench [--count N] [--jobs J]
+```
+
+Batch-scans the N most recently modified AUR packages. Prints detailed signals for any HIGH+ flagged packages.
+
+Analysis is **~0.5ms per package** (8 features, 82 regex patterns). The bottleneck is entirely AUR git I/O.
 
 ## Adding patterns
 

@@ -1,3 +1,4 @@
+mod bench;
 mod coordinator;
 mod features;
 mod shared;
@@ -45,6 +46,16 @@ enum Commands {
         /// Package name to whitelist
         package: String,
     },
+    /// Benchmark scanning the N most recently modified AUR packages
+    Bench {
+        /// Number of packages to scan
+        #[arg(long, default_value_t = 1000)]
+        count: usize,
+
+        /// Number of concurrent scan threads
+        #[arg(long, default_value_t = 8)]
+        jobs: usize,
+    },
 }
 
 fn main() {
@@ -59,6 +70,7 @@ fn main() {
         } => cmd_scan(package, pkgbuild, all_installed, json),
         Commands::Report { package, json } => cmd_report(&package, json),
         Commands::Allow { package } => cmd_allow(&package),
+        Commands::Bench { count, jobs } => bench::run(count, jobs),
     };
 
     process::exit(exit_code);

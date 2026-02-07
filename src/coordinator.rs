@@ -17,6 +17,23 @@ pub fn scan_package(package_name: &str, json: bool) -> Result<Tier, String> {
     Ok(result.tier)
 }
 
+/// Scan a package silently, returning the ScanResult without printing.
+pub fn scan_package_silent(package_name: &str) -> Result<ScanResult, String> {
+    let ctx = build_context(package_name)?;
+    Ok(run_analysis(&ctx))
+}
+
+/// Scan with pre-fetched metadata and maintainer packages (only git clone hits the network).
+/// Returns Err if git clone fails — no PKGBUILD means no meaningful scan.
+pub fn scan_package_prefetched(
+    package_name: &str,
+    metadata: crate::shared::models::AurPackage,
+    maintainer_packages: Vec<crate::shared::models::AurPackage>,
+) -> Result<ScanResult, String> {
+    let ctx = build_context_prefetched(package_name, metadata, maintainer_packages)?;
+    Ok(run_analysis(&ctx))
+}
+
 /// Build a PackageContext by fetching all data needed for analysis.
 fn build_context(package_name: &str) -> Result<PackageContext, String> {
     use crate::shared::{aur_git, aur_rpc, cache};
@@ -80,6 +97,52 @@ fn build_context(package_name: &str) -> Result<PackageContext, String> {
     })
 }
 
+/// Build context using pre-fetched metadata. Only the git clone hits the network.
+/// Returns Err if git clone fails — no PKGBUILD means no meaningful analysis.
+pub fn build_context_prefetched(
+    package_name: &str,
+    metadata: crate::shared::models::AurPackage,
+    maintainer_packages: Vec<crate::shared::models::AurPackage>,
+) -> Result<PackageContext, String> {
+    use crate::shared::{aur_git, cache};
+
+    let package_base = metadata
+        .package_base
+        .as_deref()
+        .unwrap_or(package_name);
+
+    let git_cache = cache::git_cache_dir();
+    let cache_str = git_cache.to_str().unwrap_or("/tmp/traur-git");
+
+    let repo_path = aur_git::ensure_repo(package_base, cache_str)?;
+
+    let pkgbuild = aur_git::read_pkgbuild(&repo_path).ok();
+    let install = pkgbuild
+        .as_deref()
+        .and_then(|content| aur_git::read_install_script(&repo_path, content));
+    let mut log = aur_git::read_git_log(&repo_path, 20);
+
+    if let Some(first) = log.first_mut() {
+        first.diff = aur_git::get_latest_diff(&repo_path);
+    }
+
+    let prior = if log.len() >= 2 {
+        aur_git::read_pkgbuild_at_revision(&repo_path, "HEAD~1")
+    } else {
+        None
+    };
+
+    Ok(PackageContext {
+        name: package_name.to_string(),
+        metadata: Some(metadata),
+        pkgbuild_content: pkgbuild,
+        install_script_content: install,
+        prior_pkgbuild_content: prior,
+        git_log: log,
+        maintainer_packages,
+    })
+}
+
 /// Scan a local PKGBUILD string without network access. Used for testing and --pkgbuild.
 pub fn scan_pkgbuild(name: &str, pkgbuild_content: &str) -> ScanResult {
     let ctx = PackageContext {
@@ -95,7 +158,7 @@ pub fn scan_pkgbuild(name: &str, pkgbuild_content: &str) -> ScanResult {
 }
 
 /// Run all registered features against the context and compute a score.
-fn run_analysis(ctx: &PackageContext) -> ScanResult {
+pub fn run_analysis(ctx: &PackageContext) -> ScanResult {
     let all_features = features::all_features();
 
     let mut all_signals = Vec::new();
