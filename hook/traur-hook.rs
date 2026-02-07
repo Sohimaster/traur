@@ -53,6 +53,7 @@ fn main() {
 
     let config = config::load_config();
     let mut has_critical = false;
+    let mut has_high = false;
     let mut any_scanned = false;
 
     let _ = writeln!(
@@ -82,6 +83,8 @@ fn main() {
                 output::write_text(&mut tty, &result, false);
                 if result.tier >= Tier::Critical {
                     has_critical = true;
+                } else if result.tier >= Tier::High {
+                    has_high = true;
                 }
             }
             Err(e) => {
@@ -109,9 +112,16 @@ fn main() {
         std::process::exit(1);
     }
 
-    // Prompt and read response via the same /dev/tty fd
+    // Prompt: default Y for low-risk, default N for HIGH
+    let default_yes = !has_high;
+    let prompt_text = if default_yes {
+        "traur: Continue with installation? [Y/n]"
+    } else {
+        "traur: Continue with installation? [y/N]"
+    };
+
     let _ = writeln!(tty);
-    let _ = write!(tty, "{} ", "traur: Continue with installation? [y/N]".bold());
+    let _ = write!(tty, "{} ", prompt_text.bold());
     let _ = tty.flush();
 
     let mut reader = BufReader::new(tty);
@@ -122,12 +132,16 @@ fn main() {
         Err(_) => "",
     };
 
-    match response.to_lowercase().as_str() {
-        "y" | "yes" => {} // proceed
-        _ => {
-            eprintln!("traur: aborting transaction");
-            std::process::exit(1);
-        }
+    let proceed = match response.to_lowercase().as_str() {
+        "y" | "yes" => true,
+        "n" | "no" => false,
+        "" => default_yes, // Enter = use default
+        _ => default_yes,
+    };
+
+    if !proceed {
+        eprintln!("traur: aborting transaction");
+        std::process::exit(1);
     }
 }
 
