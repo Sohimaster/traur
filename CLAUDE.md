@@ -1,6 +1,6 @@
 # traur - AUR Package Security Heuristic Scanner
 
-Heuristic scoring tool that analyzes AUR packages pre-install and flags suspicious ones. Distributed via AUR with ALPM hook integration for paru/yay.
+Heuristic security scanner for AUR packages. ALPM hook integration for paru/yay.
 
 ## Architecture
 
@@ -67,5 +67,6 @@ Edit `data/patterns.toml`. Each pattern has: `id`, `pattern` (regex), `points`, 
 | `src/shared/aur_rpc.rs` | AUR RPC v5 API client |
 | `src/shared/aur_git.rs` | Git clone/pull/diff operations |
 | `data/patterns.toml` | Regex pattern database |
+| `src/bench.rs` | Batch benchmark (parallel scan, retry, stats) |
 | `hook/traur.hook` | ALPM hook definition |
 | `hook/traur-hook.rs` | Hook binary (filters AUR pkgs, runs scans) |

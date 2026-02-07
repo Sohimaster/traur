@@ -1,8 +1,8 @@
 # traur
 
-Heuristic security scanner for AUR packages. Analyzes PKGBUILDs, install scripts, source URLs, metadata, and git history to flag suspicious packages before installation.
+Heuristic security scanner for AUR packages. Analyzes PKGBUILDs, install scripts, source URLs, metadata, and git history pre-install.
 
-Integrates with paru/yay via an ALPM hook to automatically scan packages during install.
+ALPM hook integration for paru/yay.
 
 ## Install
 
@@ -24,32 +24,32 @@ traur bench               # benchmark 1000 latest AUR packages
 
 ## How it works
 
-Each package is analyzed by 8 independent features that emit scored signals:
+8 independent features emit scored signals per package:
 
 | Feature | What it checks |
 |---------|---------------|
 | PKGBUILD analysis | 52 regex patterns for dangerous shell code |
 | Install script analysis | 19 patterns for suspicious .install hooks |
-| Source URL analysis | 11 patterns for sketchy source domains |
+| Source URL analysis | 11 patterns for untrusted source domains |
 | Checksum analysis | Missing, skipped, or weak checksums |
 | Metadata analysis | AUR votes, popularity, maintainer status |
 | Name analysis | Typosquatting and brand impersonation |
 | Maintainer analysis | New accounts, batch uploads |
 | Git history analysis | New network code, author changes |
 
-Signals are weighted into a composite score (0-100) with 5 tiers:
+Composite score 0-100, 5 tiers:
 
 ```
 LOW (0-19) → MEDIUM (20-39) → HIGH (40-59) → CRITICAL (60-79) → MALICIOUS (80-100)
 ```
 
-Override gates (curl|bash, reverse shells, Python RCE) escalate directly to MALICIOUS regardless of score.
+Override gates (curl|bash, reverse shells, Python RCE) escalate to MALICIOUS regardless of score.
 
 ## Detection coverage
 
-Patterns are derived from real AUR malware incidents:
-- **CHAOS RAT (2025)** — browser impersonation packages distributing RAT
-- **Google Chrome RAT (2025)** — .install script with Python download+execute
+Patterns derived from real AUR malware incidents:
+- **CHAOS RAT (2025)** — browser impersonation packages, RAT distribution
+- **Google Chrome RAT (2025)** — .install script, Python download+execute
 - **Acroread (2018)** — orphan takeover, curl from paste service, systemd persistence
 
 Categories: download-and-execute, reverse shells, credential theft, persistence mechanisms, privilege escalation, C2/exfiltration, cryptocurrency mining, code obfuscation, kernel module loading, environment variable theft, system reconnaissance.
@@ -60,9 +60,9 @@ Categories: download-and-execute, reverse shells, credential theft, persistence 
 traur bench [--count N] [--jobs J]
 ```
 
-Batch-scans the N most recently modified AUR packages. Prints detailed signals for any HIGH+ flagged packages.
+Scans the N most recently modified AUR packages in parallel. Prints detailed signals for HIGH+ packages.
 
-Analysis is **~0.5ms per package** (8 features, 82 regex patterns). The bottleneck is entirely AUR git I/O.
+Analysis: **~0.5ms per package** (8 features, 82 regex patterns). Bottleneck is AUR git I/O.
 
 ## Adding patterns
 
