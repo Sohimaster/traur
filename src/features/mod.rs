@@ -1,5 +1,6 @@
 pub mod checksum_analysis;
 pub mod git_history_analysis;
+pub mod gtfobins_analysis;
 pub mod install_script_analysis;
 pub mod maintainer_analysis;
 pub mod metadata_analysis;
@@ -30,5 +31,6 @@ pub fn all_features() -> Vec<Box<dyn Feature>> {
         Box::new(maintainer_analysis::MaintainerAnalysis),
         Box::new(git_history_analysis::GitHistoryAnalysis),
         Box::new(shell_analysis::ShellAnalysis),
+        Box::new(gtfobins_analysis::GtfobinsAnalysis),
     ]
 }
