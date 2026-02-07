@@ -8,7 +8,7 @@ license=('MIT')
 depends=('git' 'pacman')
 makedepends=('cargo')
 source=("$pkgname-$pkgver.tar.gz::$url/archive/v$pkgver.tar.gz")
-sha256sums=('SKIP')
+sha256sums=('53e74bdeb56e00888d90de925c3c14889e69d098aa3f4d961a6ba65e9fc1c410')
 backup=('etc/traur/config.toml')
 
 build() {
