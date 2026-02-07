@@ -2,7 +2,8 @@
 
 Pre-install trust scoring for AUR packages. Analyzes PKGBUILDs, install scripts, source URLs, metadata, and git history to score how much you should trust a package before installing it. Integrates into paru/yay as a hook.
 
-<img width="928" height="634" alt="image" src="https://github.com/user-attachments/assets/8dc3d63d-0c06-431e-99b1-1ea06b86af3c" />
+<img width="859" height="640" alt="image" src="https://github.com/user-attachments/assets/768915bd-4aa2-4450-96c7-408e73e0d103" />
+
 
 
 
