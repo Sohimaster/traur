@@ -24,7 +24,7 @@ pub fn write_text(w: &mut dyn Write, result: &ScanResult, verbose: bool) {
         result.package.bold(),
         result.score
     );
-    let _ = writeln!(w, "  Tier: {tier_colored}");
+    let _ = writeln!(w, "  Risk: {tier_colored}");
 
     if let Some(ref gate) = result.override_gate_fired {
         let _ = writeln!(w, "  {} Override gate fired: {gate}", "!!".red().bold());
