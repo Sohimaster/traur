@@ -937,13 +937,6 @@ points = 80
 description = "Go reverse shell (net.Dial)"
 override_gate = true
 
-[[gtfobins_analysis]]
-id = "G-REVSHELL-SOCKET"
-pattern = '''\bsocket\s+.*\bEXEC\b'''
-points = 75
-description = "socket utility with EXEC (reverse/bind shell)"
-override_gate = false
-
 # --- Bind Shells ---
 
 [[gtfobins_analysis]]
@@ -1058,13 +1051,6 @@ id = "G-PIPE-DASH"
 pattern = '(curl|wget)\s[^|]*\|\s*dash\b'
 points = 90
 description = "Download piped to Dash shell"
-override_gate = true
-
-[[gtfobins_analysis]]
-id = "G-PIPE-ELVISH"
-pattern = '(curl|wget)\s[^|]*\|\s*elvish\b'
-points = 90
-description = "Download piped to Elvish shell"
 override_gate = true
 
 [[gtfobins_analysis]]
@@ -1217,34 +1203,6 @@ description = "Docker/Podman run with volume mount (host filesystem access)"
 override_gate = false
 
 [[gtfobins_analysis]]
-id = "G-CTR-EXEC"
-pattern = 'ctr\s+.*\brun\b'
-points = 50
-description = "containerd ctr run (container execution)"
-override_gate = false
-
-[[gtfobins_analysis]]
-id = "G-KUBECTL-EXEC"
-pattern = 'kubectl\s+exec\s'
-points = 50
-description = "kubectl exec into container"
-override_gate = false
-
-[[gtfobins_analysis]]
-id = "G-LXD-EXEC"
-pattern = 'lxd\s+.*\binit\b|lxc\s+exec\s'
-points = 50
-description = "LXD/LXC container escape or execution"
-override_gate = false
-
-[[gtfobins_analysis]]
-id = "G-SNAP-RUN"
-pattern = 'snap\s+run\s+--shell\b'
-points = 55
-description = "snap run --shell (confined shell escape)"
-override_gate = false
-
-[[gtfobins_analysis]]
 id = "G-SYSTEMD-RUN"
 pattern = 'systemd-run\s'
 points = 55
@@ -1263,27 +1221,6 @@ id = "G-SCRIPT-EXEC"
 pattern = 'script\s+(-c|--command)\s'
 points = 45
 description = "script -c command execution"
-override_gate = false
-
-[[gtfobins_analysis]]
-id = "G-LOGINCTL-SHELL"
-pattern = 'loginctl\s+.*user-shell'
-points = 50
-description = "loginctl user-shell (session hijack)"
-override_gate = false
-
-[[gtfobins_analysis]]
-id = "G-START-STOP-DAEMON"
-pattern = 'start-stop-daemon\s.*--exec\s'
-points = 55
-description = "start-stop-daemon arbitrary exec"
-override_gate = false
-
-[[gtfobins_analysis]]
-id = "G-CPULIMIT-EXEC"
-pattern = 'cpulimit\s.*(-l\s+\d+).*(-e|--exe)\s'
-points = 45
-description = "cpulimit wrapper command execution"
 override_gate = false
 
 [[gtfobins_analysis]]
@@ -1363,13 +1300,6 @@ id = "G-DOWNLOAD-NODE"
 pattern = 'node\s+.*(-e|--eval)\s.*\bhttp\b.*\bget\b|npm\s+exec\s|npx\s+\S'
 points = 50
 description = "Node.js HTTP download or npx remote execution"
-override_gate = false
-
-[[gtfobins_analysis]]
-id = "G-DOWNLOAD-URLGET"
-pattern = 'urlget\s'
-points = 45
-description = "urlget download utility"
 override_gate = false
 
 # --- Interpreter Inline Execution (supporting signals) ---
@@ -1452,13 +1382,6 @@ description = "GNU Octave system() command execution"
 override_gate = false
 
 [[gtfobins_analysis]]
-id = "G-CLISP-EXEC"
-pattern = 'clisp\s.*-x\s.*shell\b'
-points = 55
-description = "CLISP shell command execution"
-override_gate = false
-
-[[gtfobins_analysis]]
 id = "G-GUILE-EXEC"
 pattern = 'guile\s.*-c\s.*system\b'
 points = 55
@@ -1470,13 +1393,6 @@ id = "G-IRONSQL-EXEC"
 pattern = 'irb\s.*-r\s|irb\s.*-e\s'
 points = 40
 description = "Ruby IRB interactive session with code execution"
-override_gate = false
-
-[[gtfobins_analysis]]
-id = "G-GIMP-EXEC"
-pattern = 'gimp\s.*-idf\s.*--batch-interpreter.*Script-Fu'
-points = 55
-description = "GIMP Script-Fu batch interpreter execution"
 override_gate = false
 
 # --- Library Injection ---
@@ -1616,20 +1532,6 @@ description = "cpio --rsh-command (arbitrary command execution)"
 override_gate = false
 
 [[gtfobins_analysis]]
-id = "G-FZF-PREVIEW"
-pattern = 'fzf\s.*--preview\s'
-points = 55
-description = "fzf --preview (executes arbitrary command per entry)"
-override_gate = false
-
-[[gtfobins_analysis]]
-id = "G-TEX-SHELLESCAPE"
-pattern = '\\write18\s*\{|(-shell-escape|--shell-escape)\s'
-points = 70
-description = "TeX/LaTeX \\write18 shell escape (arbitrary command execution)"
-override_gate = false
-
-[[gtfobins_analysis]]
 id = "G-DC-SHELL"
 pattern = '\bdc\s.*[!]'
 points = 55
@@ -1665,24 +1567,10 @@ description = "CMake command execution (env wrapper or execute_process)"
 override_gate = false
 
 [[gtfobins_analysis]]
-id = "G-RPM-EVAL"
-pattern = '''rpm\s.*--eval\s.*%\{lua:'''
-points = 65
-description = "RPM --eval Lua code execution"
-override_gate = false
-
-[[gtfobins_analysis]]
 id = "G-PSQL-SHELL"
 pattern = 'psql\s.*-c\s.*\\!'
 points = 60
 description = "PostgreSQL psql shell escape (\\!)"
-override_gate = false
-
-[[gtfobins_analysis]]
-id = "G-PUPPET-EXEC"
-pattern = 'puppet\s+apply\s.*-e\s.*exec\s*\{'
-points = 60
-description = "Puppet apply exec resource (command execution)"
 override_gate = false
 
 [[gtfobins_analysis]]
@@ -1725,13 +1613,6 @@ id = "G-ED-SHELL"
 pattern = '\bed\b\s.*<<<.*[!]'
 points = 55
 description = "ed editor shell escape (! command)"
-override_gate = false
-
-[[gtfobins_analysis]]
-id = "G-SERVICE-EXEC"
-pattern = 'service\s+\.\./.*\b(sh|bash)\b'
-points = 65
-description = "service path traversal to shell execution"
 override_gate = false
 
 [[gtfobins_analysis]]
@@ -1811,13 +1692,6 @@ description = "Bind mount (filesystem overlay for privilege escalation)"
 override_gate = false
 
 [[gtfobins_analysis]]
-id = "G-UPDATE-ALTERNATIVES"
-pattern = 'update-alternatives\s+--install\s'
-points = 55
-description = "update-alternatives --install (system binary path hijack)"
-override_gate = false
-
-[[gtfobins_analysis]]
 id = "G-INSTALL-SUID"
 pattern = 'install\s+.*-m\s*[0-7]*[4-7][0-7]{2}\s'
 points = 70
@@ -1863,9 +1737,3 @@ points = 55
 description = "Tailscale file copy (VPN-based data exfiltration)"
 override_gate = false
 
-[[gtfobins_analysis]]
-id = "G-RLOGIN-SHELL"
-pattern = 'rlogin\s'
-points = 50
-description = "rlogin remote login (insecure remote shell)"
-override_gate = false

