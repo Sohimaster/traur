@@ -6,6 +6,7 @@ pub struct PackageContext {
     pub metadata: Option<AurPackage>,
     pub pkgbuild_content: Option<String>,
     pub install_script_content: Option<String>,
+    pub prior_pkgbuild_content: Option<String>,
     pub git_log: Vec<GitCommit>,
     pub maintainer_packages: Vec<AurPackage>,
 }

@@ -5,8 +5,8 @@ Verifies integrity of source checksum declarations in PKGBUILDs.
 ## What it detects
 
 - **No checksums**: No checksum array at all (P-NO-CHECKSUMS, +30)
-- **All SKIP**: Every checksum is 'SKIP' on non-VCS packages (P-SKIP-ALL, +25)
-- **Weak algorithms**: md5sums without stronger alternative (P-WEAK-CHECKSUMS, +10)
+- **All SKIP**: Every entry in every checksum array is 'SKIP' on non-VCS packages (P-SKIP-ALL, +25). Properly parses multi-entry arrays.
+- **Weak algorithms**: md5sums or sha1sums without stronger alternative (P-WEAK-CHECKSUMS, +10)
 - **Count mismatch**: Source count != checksum count (P-CHECKSUM-MISMATCH, +40)
 
 ## Signals emitted
@@ -20,4 +20,8 @@ All signals use `SignalCategory::Pkgbuild` (weight 0.45). Implemented directly i
 ## Known false positives
 
 - VCS packages (`-git`, `-svn`, `-hg`, `-bzr`) legitimately use `SKIP` checksums. The feature exempts these.
-- `P-WEAK-CHECKSUMS` (+10): Some older upstream projects only provide md5 hashes. Low points reflect this.
+- `P-WEAK-CHECKSUMS` (+10): Some older upstream projects only provide md5/sha1 hashes. Low points reflect this.
+
+## Performance
+
+All regexes are compiled once via `LazyLock` statics and reused across invocations.

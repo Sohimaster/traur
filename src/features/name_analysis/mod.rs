@@ -1,6 +1,7 @@
 use crate::features::Feature;
 use crate::shared::models::PackageContext;
 use crate::shared::scoring::{Signal, SignalCategory};
+use std::sync::LazyLock;
 use strsim::levenshtein;
 
 /// Suspicious suffixes that indicate impersonation attempts.
@@ -14,6 +15,13 @@ const IMPERSONATION_SUFFIXES: &[&str] = &[
     "-plus",
     "-mod",
     "-modded",
+    "-pro",
+    "-premium",
+    "-free",
+    "-cracked",
+    "-hack",
+    "-custom",
+    "-lite",
 ];
 
 /// Popular brand names commonly targeted for impersonation.
@@ -36,7 +44,63 @@ const BRAND_NAMES: &[&str] = &[
     "1password",
     "bitwarden",
     "keepass",
+    "vlc",
+    "mpv",
+    "neovim",
+    "gimp",
+    "blender",
+    "thunderbird",
+    "protonvpn",
+    "mullvad",
+    "nordvpn",
+    "tor-browser",
 ];
+
+static TOP_PACKAGES: LazyLock<Vec<String>> = LazyLock::new(|| {
+    [
+        "yay",
+        "paru",
+        "google-chrome",
+        "spotify",
+        "visual-studio-code-bin",
+        "brave-bin",
+        "discord",
+        "slack-desktop",
+        "zoom",
+        "teams",
+        "librewolf-bin",
+        "zen-browser-bin",
+        "firefox",
+        "chromium",
+        "steam",
+        "lutris",
+        "mangohud",
+        "gamemode",
+        "proton-ge-custom",
+        "timeshift",
+        "pamac-aur",
+        "octopi",
+        "downgrade",
+        "nerd-fonts-complete",
+        "ttf-ms-fonts",
+        "obs-studio",
+        "vlc",
+        "mpv",
+        "neovim",
+        "vim",
+        "emacs",
+        "gimp",
+        "blender",
+        "thunderbird",
+        "protonvpn",
+        "mullvad-vpn",
+        "nordvpn-bin",
+        "tor-browser",
+    ]
+    .iter()
+    .map(|s| s.to_string())
+    .collect()
+});
 
 pub struct NameAnalysis;
 
@@ -73,8 +137,7 @@ impl Feature for NameAnalysis {
         }
 
         // Check typosquatting against top packages
-        let top_packages = top_package_names();
-        for top in &top_packages {
+        for top in TOP_PACKAGES.iter() {
             if top == name {
                 continue;
             }
@@ -95,23 +158,4 @@ impl Feature for NameAnalysis {
 
         signals
     }
-}
-
-/// Returns a list of well-known popular package names for comparison.
-/// In production this would be fetched/cached from AUR + official repos.
-fn top_package_names() -> Vec<String> {
-    // Hardcoded seed list of popular AUR + official packages.
-    // TODO: auto-update from AUR RPC + pacman -Sql
-    [
-        "yay", "paru", "google-chrome", "spotify", "visual-studio-code-bin",
-        "brave-bin", "discord", "slack-desktop", "zoom", "teams",
-        "librewolf-bin", "zen-browser-bin", "firefox", "chromium",
-        "steam", "lutris", "mangohud", "gamemode", "proton-ge-custom",
-        "timeshift", "pamac-aur", "octopi", "downgrade",
-        "nerd-fonts-complete", "ttf-ms-fonts", "obs-studio",
-        "vlc", "mpv", "neovim", "vim", "emacs",
-    ]
-    .iter()
-    .map(|s| s.to_string())
-    .collect()
 }

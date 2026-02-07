@@ -1,6 +1,6 @@
 # Source URL Analysis
 
-Checks source URLs in PKGBUILDs for suspicious domains and patterns.
+Checks source URLs in the `source=()` array of PKGBUILDs for suspicious domains and patterns.
 
 ## What it detects
 
@@ -9,6 +9,13 @@ Checks source URLs in PKGBUILDs for suspicious domains and patterns.
 - **Discord webhooks**: Data exfiltration channel
 - **Paste services**: pastebin.com, paste.ee — mutable, untrusted content hosting
 - **Dynamic DNS**: duckdns.org, no-ip.com — common in C2 infrastructure
+- **Telegram bot API**: Data exfiltration via Telegram bots
+- **Tunnel services**: ngrok, serveo, localtunnel — obfuscated endpoints
+- **Plain HTTP**: Source URLs without TLS (MITM risk, low points)
+
+## Scope
+
+Only matches against the `source=()` array content, NOT the entire PKGBUILD. URLs in comments or code body are ignored by this feature (exfiltration URLs in code are caught by `pkgbuild_analysis` instead).
 
 ## Signals emitted
 
@@ -16,5 +23,9 @@ All signals use `SignalCategory::Pkgbuild` (weight 0.45). See `data/patterns.tom
 
 ## Dependencies
 
-- `shared/patterns.rs` — regex pattern matching
-- `PackageContext.pkgbuild_content` — scans source=() array and full PKGBUILD content
+- `shared/patterns.rs` — regex pattern matching (cached via OnceLock in `patterns.rs`)
+- `PackageContext.pkgbuild_content` — extracts source=() array from PKGBUILD content
+
+## Performance
+
+Patterns are compiled once via `OnceLock` and reused across invocations. Source array regex is cached via `LazyLock`.

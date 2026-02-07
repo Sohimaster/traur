@@ -117,6 +117,21 @@ pub fn read_git_log(repo_path: &std::path::Path, max_commits: usize) -> Vec<GitC
     commits
 }
 
+/// Read the PKGBUILD content at a specific git revision (e.g., "HEAD~1").
+pub fn read_pkgbuild_at_revision(repo_path: &std::path::Path, revision: &str) -> Option<String> {
+    let output = Command::new("git")
+        .args(["show", &format!("{revision}:PKGBUILD")])
+        .current_dir(repo_path)
+        .output()
+        .ok()?;
+
+    if output.status.success() {
+        Some(String::from_utf8_lossy(&output.stdout).to_string())
+    } else {
+        None
+    }
+}
+
 /// Get the diff of the most recent commit.
 pub fn get_latest_diff(repo_path: &std::path::Path) -> Option<String> {
     let output = Command::new("git")

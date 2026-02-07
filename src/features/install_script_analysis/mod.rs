@@ -1,6 +1,7 @@
+pub mod patterns;
+
 use crate::features::Feature;
 use crate::shared::models::PackageContext;
-use crate::shared::patterns::load_patterns;
 use crate::shared::scoring::{Signal, SignalCategory};
 
 pub struct InstallScriptAnalysis;
@@ -15,10 +16,10 @@ impl Feature for InstallScriptAnalysis {
             return Vec::new();
         };
 
-        let compiled = load_patterns("install_script_analysis");
+        let compiled = patterns::compiled_patterns();
         let mut signals = Vec::new();
 
-        for pat in &compiled {
+        for pat in compiled {
             if pat.regex.is_match(content) {
                 signals.push(Signal {
                     id: pat.id.clone(),

@@ -28,7 +28,7 @@ final = 0.15*metadata + 0.45*pkgbuild + 0.25*behavioral + 0.15*temporal
 
 Tiers: LOW (0-19), MEDIUM (20-39), HIGH (40-59), CRITICAL (60-79), MALICIOUS (80-100).
 
-Override gates: Certain signals (curl|bash, reverse shells) escalate directly to MALICIOUS.
+Override gates: Certain signals (curl|bash, curl|python, reverse shells) escalate directly to MALICIOUS.
 
 ## Build
 

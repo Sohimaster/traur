@@ -1,7 +1,14 @@
+pub mod patterns;
+
 use crate::features::Feature;
 use crate::shared::models::PackageContext;
-use crate::shared::patterns::load_patterns;
 use crate::shared::scoring::{Signal, SignalCategory};
+use regex::Regex;
+use std::sync::LazyLock;
+
+static SOURCE_ARRAY_RE: LazyLock<Regex> = LazyLock::new(|| {
+    Regex::new(r"(?ms)^source=\((.*?)\)").unwrap()
+});
 
 pub struct SourceUrlAnalysis;
 
@@ -15,11 +22,17 @@ impl Feature for SourceUrlAnalysis {
             return Vec::new();
         };
 
-        let compiled = load_patterns("source_url_analysis");
+        // Only match against the source=() array, not comments or other code
+        let source_content = match SOURCE_ARRAY_RE.captures(content) {
+            Some(caps) => caps[1].to_string(),
+            None => return Vec::new(),
+        };
+
+        let compiled = patterns::compiled_patterns();
         let mut signals = Vec::new();
 
-        for pat in &compiled {
-            if pat.regex.is_match(content) {
+        for pat in compiled {
+            if pat.regex.is_match(&source_content) {
                 signals.push(Signal {
                     id: pat.id.clone(),
                     category: SignalCategory::Pkgbuild,

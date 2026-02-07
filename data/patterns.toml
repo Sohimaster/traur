@@ -135,6 +135,83 @@ points = 60
 description = "Reading system password files"
 override_gate = false
 
+[[pkgbuild_analysis]]
+id = "P-DISCORD-WEBHOOK"
+pattern = 'discord(app)?\.com/api/webhooks/'
+points = 70
+description = "Discord webhook URL (data exfiltration channel)"
+override_gate = false
+
+[[pkgbuild_analysis]]
+id = "P-URL-SHORTENER"
+pattern = '(bit\.ly|tinyurl\.com|t\.co|is\.gd|v\.gd|short\.io)/'
+points = 60
+description = "URL shortener (hiding real destination)"
+override_gate = false
+
+[[pkgbuild_analysis]]
+id = "P-CURL-PIPE-PYTHON"
+pattern = 'curl\s[^|]*\|\s*python[23]?'
+points = 90
+description = "curl output piped to Python interpreter (download-and-execute)"
+override_gate = true
+
+[[pkgbuild_analysis]]
+id = "P-CURL-PIPE-PERL"
+pattern = 'curl\s[^|]*\|\s*perl'
+points = 90
+description = "curl output piped to Perl interpreter (download-and-execute)"
+override_gate = true
+
+[[pkgbuild_analysis]]
+id = "P-WGET-PIPE-PYTHON"
+pattern = 'wget\s[^|]*\|\s*python[23]?'
+points = 90
+description = "wget output piped to Python interpreter (download-and-execute)"
+override_gate = true
+
+[[pkgbuild_analysis]]
+id = "P-PYTHON-INLINE"
+pattern = "python[23]?\\s+-c\\s+[\"']"
+points = 45
+description = "Python inline code execution"
+override_gate = false
+
+[[pkgbuild_analysis]]
+id = "P-SUID-BIT"
+pattern = 'chmod\s+[ugo]*\+s\s|chmod\s+[0-7]*[4-7][0-7]{2}\s'
+points = 70
+description = "Setting SUID/SGID bit (privilege escalation)"
+override_gate = false
+
+[[pkgbuild_analysis]]
+id = "P-MKFIFO"
+pattern = 'mkfifo\s'
+points = 55
+description = "Named pipe creation (possible reverse shell component)"
+override_gate = false
+
+[[pkgbuild_analysis]]
+id = "P-OPENSSL-CLIENT"
+pattern = 'openssl\s+s_client'
+points = 55
+description = "OpenSSL client connection (possible encrypted C2 channel)"
+override_gate = false
+
+[[pkgbuild_analysis]]
+id = "P-CLIPBOARD-READ"
+pattern = '(xclip|xsel|wl-paste)\s'
+points = 50
+description = "Clipboard access (possible credential theft)"
+override_gate = false
+
+[[pkgbuild_analysis]]
+id = "P-DISK-READ"
+pattern = 'dd\s+if=/dev/sd'
+points = 60
+description = "Direct disk device read (data exfiltration)"
+override_gate = false
+
 # Install script patterns
 [[install_script_analysis]]
 id = "P-INSTALL-CURL"
@@ -171,6 +248,48 @@ points = 55
 description = "Shell profile modification in install script"
 override_gate = false
 
+[[install_script_analysis]]
+id = "P-INSTALL-SSH-ACCESS"
+pattern = '~/\.ssh/|/home/[^/]+/\.ssh/'
+points = 80
+description = "Accessing SSH keys from install script"
+override_gate = false
+
+[[install_script_analysis]]
+id = "P-INSTALL-BROWSER-DATA"
+pattern = '\.(mozilla|config/chromium|config/google-chrome|config/BraveSoftware)/'
+points = 75
+description = "Accessing browser profile data from install script"
+override_gate = false
+
+[[install_script_analysis]]
+id = "P-INSTALL-GPG-ACCESS"
+pattern = '~/\.gnupg/|/home/[^/]+/\.gnupg/'
+points = 70
+description = "Accessing GPG keyring from install script"
+override_gate = false
+
+[[install_script_analysis]]
+id = "P-INSTALL-PASSWD-READ"
+pattern = '/etc/(passwd|shadow)'
+points = 65
+description = "Reading system password files from install script"
+override_gate = false
+
+[[install_script_analysis]]
+id = "P-INSTALL-BASE64"
+pattern = 'base64\s+(-d|--decode)'
+points = 65
+description = "Base64 decoding in install script (possible payload hiding)"
+override_gate = false
+
+[[install_script_analysis]]
+id = "P-INSTALL-EVAL"
+pattern = 'eval\s+["$]'
+points = 55
+description = "Dynamic code execution via eval in install script"
+override_gate = false
+
 # Source URL patterns
 [[source_url_analysis]]
 id = "P-RAW-IP-URL"
@@ -205,4 +324,25 @@ id = "P-DYNAMIC-DNS"
 pattern = '(duckdns\.org|no-ip\.com|ddns\.net|dynu\.com)/'
 points = 55
 description = "Source uses dynamic DNS (common in C2 infrastructure)"
+override_gate = false
+
+[[source_url_analysis]]
+id = "P-TELEGRAM-BOT"
+pattern = '(telegram\.org/bot|api\.telegram\.org/bot)'
+points = 65
+description = "Telegram bot API URL (data exfiltration channel)"
+override_gate = false
+
+[[source_url_analysis]]
+id = "P-TUNNEL-SERVICE"
+pattern = '(ngrok\.io|serveo\.net|localtunnel\.me|localhost\.run)/'
+points = 55
+description = "Tunnel service URL (obfuscated endpoint)"
+override_gate = false
+
+[[source_url_analysis]]
+id = "P-HTTP-SOURCE"
+pattern = 'http://[^$\s]'
+points = 15
+description = "Plain HTTP source URL (no TLS, MITM risk)"
 override_gate = false

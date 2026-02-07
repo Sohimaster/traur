@@ -33,7 +33,7 @@ fn build_context(package_name: &str) -> Result<PackageContext, String> {
     let git_cache = cache::git_cache_dir();
     let cache_str = git_cache.to_str().unwrap_or("/tmp/traur-git");
 
-    let (pkgbuild_content, install_script_content, git_log) =
+    let (pkgbuild_content, install_script_content, git_log, prior_pkgbuild_content) =
         match aur_git::ensure_repo(package_base, cache_str) {
             Ok(repo_path) => {
                 let pkgbuild = aur_git::read_pkgbuild(&repo_path).ok();
@@ -47,11 +47,18 @@ fn build_context(package_name: &str) -> Result<PackageContext, String> {
                     first.diff = aur_git::get_latest_diff(&repo_path);
                 }
 
-                (pkgbuild, install, log)
+                // Read prior PKGBUILD for diff comparison
+                let prior = if log.len() >= 2 {
+                    aur_git::read_pkgbuild_at_revision(&repo_path, "HEAD~1")
+                } else {
+                    None
+                };
+
+                (pkgbuild, install, log, prior)
             }
             Err(e) => {
                 eprintln!("Warning: failed to clone AUR repo for {package_base}: {e}");
-                (None, None, Vec::new())
+                (None, None, Vec::new(), None)
             }
         };
 
@@ -67,6 +74,7 @@ fn build_context(package_name: &str) -> Result<PackageContext, String> {
         metadata: Some(metadata),
         pkgbuild_content,
         install_script_content,
+        prior_pkgbuild_content,
         git_log,
         maintainer_packages,
     })
@@ -79,6 +87,7 @@ pub fn scan_pkgbuild(name: &str, pkgbuild_content: &str) -> ScanResult {
         metadata: None,
         pkgbuild_content: Some(pkgbuild_content.to_string()),
         install_script_content: None,
+        prior_pkgbuild_content: None,
         git_log: Vec::new(),
         maintainer_packages: Vec::new(),
     };
