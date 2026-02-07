@@ -1,10 +1,12 @@
 # traur
 
 Heuristic security scanner for AUR packages. Analyzes PKGBUILDs, install scripts, source URLs, metadata, and git history pre-install.
+integrates into paru/yay as a hook and displays risk analysis
 
-ALPM hook integration for paru/yay.
+<img width="942" height="453" alt="image" src="https://github.com/user-attachments/assets/f9b375a3-d9f9-412c-af73-f80ba86472e8" />
 
-## Install
+
+## Installation
 
 ```bash
 paru -S traur
@@ -27,7 +29,7 @@ traur bench               # benchmark 1000 latest AUR packages
 | Feature | What it checks |
 |---------|---------------|
 | PKGBUILD analysis | Dangerous shell code |
-| Install script analysis | Duspicious .install hooks |
+| Install script analysis | Suspicious .install hooks |
 | Source URL analysis | Untrusted source domains |
 | Checksum analysis | Missing, skipped, or weak checksums |
 | Metadata analysis | AUR votes, popularity, maintainer status |
@@ -36,14 +38,6 @@ traur bench               # benchmark 1000 latest AUR packages
 | Git history analysis | New network code, author changes |
 | Shell analysis | Beyond-regex obfuscation (var concat, indirect exec, data blobs) |
 | GTFOBins analysis | Legitimate binary abuse |
-
-Composite score 0-100, 5 tiers:
-
-```
-LOW (0-19) → MEDIUM (20-39) → HIGH (40-59) → CRITICAL (60-79) → MALICIOUS (80-100)
-```
-
-47 override gates (download-and-execute, reverse shells, GTFOBins abuse, variable-concatenated exec) escalate to MALICIOUS regardless of score.
 
 ## Detection coverage
 
@@ -63,19 +57,6 @@ traur bench [--count N] [--jobs J]
 Scans the N most recently modified AUR packages in parallel. Prints detailed signals for HIGH+ packages.
 
 Analysis: **~0.5ms per package** (10 features, 239 regex patterns). Bottleneck is AUR git I/O.
-
-## Adding patterns
-
-Edit `data/patterns.toml`:
-
-```toml
-[[pkgbuild_analysis]]
-id = "P-MY-PATTERN"
-pattern = 'regex_here'
-points = 70
-description = "What this detects"
-override_gate = false
-```
 
 ## License
 
