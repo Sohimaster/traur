@@ -16,6 +16,7 @@ sudo install -Dm644 hook/traur.hook /usr/share/libalpm/hooks/traur.hook
 ## Usage
 
 ```bash
+traur scan                # scan all installed aur packages
 traur scan <package>      # scan a package
 traur report <package>    # detailed signal breakdown
 traur allow <package>     # whitelist a package
@@ -28,16 +29,16 @@ traur bench               # benchmark 1000 latest AUR packages
 
 | Feature | What it checks |
 |---------|---------------|
-| PKGBUILD analysis | 84 regex patterns for dangerous shell code |
-| Install script analysis | 27 patterns for suspicious .install hooks |
-| Source URL analysis | 11 patterns for untrusted source domains |
+| PKGBUILD analysis | angerous shell code |
+| Install script analysis | suspicious .install hooks |
+| Source URL analysis | untrusted source domains |
 | Checksum analysis | Missing, skipped, or weak checksums |
 | Metadata analysis | AUR votes, popularity, maintainer status |
 | Name analysis | Typosquatting and brand impersonation |
 | Maintainer analysis | New accounts, batch uploads |
 | Git history analysis | New network code, author changes |
 | Shell analysis | Beyond-regex obfuscation (var concat, indirect exec, data blobs) |
-| GTFOBins analysis | 117 patterns for legitimate binary abuse |
+| GTFOBins analysis | legitimate binary abuse |
 
 Composite score 0-100, 5 tiers:
 
