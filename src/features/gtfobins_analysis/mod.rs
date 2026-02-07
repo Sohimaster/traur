@@ -7,10 +7,6 @@ use crate::shared::scoring::{Signal, SignalCategory};
 pub struct GtfobinsAnalysis;
 
 impl Feature for GtfobinsAnalysis {
-    fn name(&self) -> &str {
-        "gtfobins_analysis"
-    }
-
     fn analyze(&self, ctx: &PackageContext) -> Vec<Signal> {
         let Some(ref content) = ctx.pkgbuild_content else {
             return Vec::new();
@@ -21,12 +17,17 @@ impl Feature for GtfobinsAnalysis {
 
         for pat in compiled {
             if pat.regex.is_match(content) {
+                let matched_line = content
+                    .lines()
+                    .find(|line| pat.regex.is_match(line))
+                    .map(|line| line.trim().to_string());
                 signals.push(Signal {
                     id: pat.id.clone(),
                     category: SignalCategory::Pkgbuild,
                     points: pat.points,
                     description: pat.description.clone(),
                     is_override_gate: pat.override_gate,
+                    matched_line,
                 });
             }
         }
@@ -863,5 +864,45 @@ build() {
         // Normal install without SUID bits
         let ids = analyze("install -Dm755 binary /usr/bin/binary");
         assert!(!has(&ids, "G-INSTALL-SUID"), "Normal install should not trigger SUID pattern");
+    }
+
+    // --- sed -e flag false positive regression ---
+
+    #[test]
+    fn sed_dash_e_flag_no_signal() {
+        let ids = analyze("sed -e 's/foo/bar/' file");
+        assert!(!has(&ids, "G-SED-EXEC"), "sed -e flag should not trigger, got: {ids:?}");
+    }
+
+    #[test]
+    fn sed_combined_flags_no_signal() {
+        let ids = analyze("sed -i -e 's/old/new/g' file.txt");
+        assert!(!has(&ids, "G-SED-EXEC"), "sed -i -e should not trigger, got: {ids:?}");
+    }
+
+    // --- install -m755 false positive regression ---
+
+    #[test]
+    fn install_m755_no_suid() {
+        let ids = analyze("install -m755 binary /usr/bin/binary");
+        assert!(!has(&ids, "G-INSTALL-SUID"), "install -m755 should not trigger SUID, got: {ids:?}");
+    }
+
+    #[test]
+    fn install_m644_no_suid() {
+        let ids = analyze("install -m644 license /usr/share/licenses/pkg/LICENSE");
+        assert!(!has(&ids, "G-INSTALL-SUID"), "install -m644 should not trigger SUID, got: {ids:?}");
+    }
+
+    #[test]
+    fn install_suid_4755_detected() {
+        let ids = analyze("install -m 4755 evil /usr/bin/evil");
+        assert!(has(&ids, "G-INSTALL-SUID"), "got: {ids:?}");
+    }
+
+    #[test]
+    fn install_suid_2755_detected() {
+        let ids = analyze("install -m2755 evil /usr/bin/evil");
+        assert!(has(&ids, "G-INSTALL-SUID"), "got: {ids:?}");
     }
 }

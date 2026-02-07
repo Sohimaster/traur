@@ -31,10 +31,6 @@ static TOKEN_RE: LazyLock<Regex> = LazyLock::new(|| {
 pub struct ChecksumAnalysis;
 
 impl Feature for ChecksumAnalysis {
-    fn name(&self) -> &str {
-        "checksum_analysis"
-    }
-
     fn analyze(&self, ctx: &PackageContext) -> Vec<Signal> {
         let Some(ref content) = ctx.pkgbuild_content else {
             return Vec::new();
@@ -54,6 +50,7 @@ impl Feature for ChecksumAnalysis {
                 points: 30,
                 description: "No checksum array found in PKGBUILD".to_string(),
                 is_override_gate: false,
+                matched_line: None,
             });
         }
 
@@ -65,6 +62,7 @@ impl Feature for ChecksumAnalysis {
                 points: 25,
                 description: "All checksums are SKIP (no integrity verification)".to_string(),
                 is_override_gate: false,
+                matched_line: None,
             });
         }
 
@@ -77,25 +75,31 @@ impl Feature for ChecksumAnalysis {
                 description: "Using weak checksums (md5/sha1) without stronger alternative"
                     .to_string(),
                 is_override_gate: false,
+                matched_line: None,
             });
         }
 
-        // Check source count vs checksum count mismatch
-        let source_count = count_array_entries(content, "source");
-        if source_count > 0 {
-            for algo in &["md5sums", "sha256sums", "sha512sums", "b2sums"] {
-                let checksum_count = count_array_entries(content, algo);
-                if checksum_count > 0 && checksum_count != source_count {
-                    signals.push(Signal {
-                        id: "P-CHECKSUM-MISMATCH".to_string(),
-                        category: SignalCategory::Pkgbuild,
-                        points: 40,
-                        description: format!(
-                            "Source count ({source_count}) != {algo} count ({checksum_count})"
-                        ),
-                        is_override_gate: false,
-                    });
-                    break;
+        // Check source count vs checksum count mismatch (including arch-specific arrays)
+        for suffix in find_array_suffixes(content) {
+            let source_name = format!("source{suffix}");
+            let src_count = count_array_entries(content, &source_name);
+            if src_count > 0 {
+                for algo in &["md5sums", "sha256sums", "sha512sums", "b2sums"] {
+                    let checksum_name = format!("{algo}{suffix}");
+                    let cksum_count = count_array_entries(content, &checksum_name);
+                    if cksum_count > 0 && cksum_count != src_count {
+                        signals.push(Signal {
+                            id: "P-CHECKSUM-MISMATCH".to_string(),
+                            category: SignalCategory::Pkgbuild,
+                            points: 40,
+                            description: format!(
+                                "{source_name} count ({src_count}) != {checksum_name} count ({cksum_count})"
+                            ),
+                            is_override_gate: false,
+                            matched_line: None,
+                        });
+                        break;
+                    }
                 }
             }
         }
@@ -128,6 +132,14 @@ fn has_all_skip_checksums(content: &str) -> bool {
     }
 
     found_any
+}
+
+/// Find all source array suffixes (e.g. "", "_x86_64", "_i686").
+fn find_array_suffixes(content: &str) -> Vec<String> {
+    let re = Regex::new(r"(?m)^source(_[a-zA-Z0-9_]+)?\s*=\s*\(").unwrap();
+    re.captures_iter(content)
+        .map(|c| c.get(1).map_or(String::new(), |m| m.as_str().to_string()))
+        .collect()
 }
 
 /// Count entries in a bash array like source=(...) or sha256sums=(...)
@@ -197,5 +209,19 @@ mod tests {
     fn strong_checksum_no_weak_flag() {
         let ids = analyze("test-pkg", "pkgname=test\nsource=('a.tar.gz')\nsha256sums=('abc123')\n");
         assert!(!has(&ids, "P-WEAK-CHECKSUMS"));
+    }
+
+    // --- Arch-specific array false positive regression ---
+
+    #[test]
+    fn checksum_arch_specific_no_mismatch() {
+        let ids = analyze("test-pkg", "source=('a.tar.gz' 'b.patch')\nsource_x86_64=('c.tar.gz')\nsha256sums=('hash1' 'hash2')\nsha256sums_x86_64=('hash3')\n");
+        assert!(!has(&ids, "P-CHECKSUM-MISMATCH"), "Arch-specific arrays should not cause mismatch, got: {ids:?}");
+    }
+
+    #[test]
+    fn checksum_arch_specific_real_mismatch() {
+        let ids = analyze("test-pkg", "source=('a.tar.gz' 'b.patch')\nsha256sums=('hash1')\n");
+        assert!(has(&ids, "P-CHECKSUM-MISMATCH"));
     }
 }

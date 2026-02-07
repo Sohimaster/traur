@@ -69,14 +69,19 @@ static ECHO_SUBSHELL_RE: LazyLock<Regex> = LazyLock::new(|| {
         .unwrap()
 });
 
-/// Long hex string (128+ hex chars = 64+ bytes, beyond any normal checksum)
+/// Long hex string (129+ hex chars; 128 = SHA-512, so 129+ avoids checksum FPs)
 static LONG_HEX_RE: LazyLock<Regex> = LazyLock::new(|| {
-    Regex::new(r"[0-9a-fA-F]{128,}").unwrap()
+    Regex::new(r"[0-9a-fA-F]{129,}").unwrap()
 });
 
-/// Checksum array line
+/// Checksum array line (declaration)
 static CHECKSUM_LINE_RE: LazyLock<Regex> = LazyLock::new(|| {
     Regex::new(r"(?i)(md5|sha\d+|b2)sums").unwrap()
+});
+
+/// Checksum array opening: sha256sums=( or sha256sums_x86_64=(
+static CHECKSUM_ARRAY_OPEN_RE: LazyLock<Regex> = LazyLock::new(|| {
+    Regex::new(r"(?i)(md5|sha\d+|b2)sums(_[a-zA-Z0-9_]+)?\s*=\s*\(").unwrap()
 });
 
 /// Long base64 string (100+ chars of base64 alphabet)
@@ -104,10 +109,6 @@ static CHMOD_EXEC_RE: LazyLock<Regex> = LazyLock::new(|| {
 pub struct ShellAnalysis;
 
 impl Feature for ShellAnalysis {
-    fn name(&self) -> &str {
-        "shell_analysis"
-    }
-
     fn analyze(&self, ctx: &PackageContext) -> Vec<Signal> {
         let Some(ref content) = ctx.pkgbuild_content else {
             return Vec::new();
@@ -232,6 +233,7 @@ fn analyze_variable_resolution(
                         i + 1
                     ),
                     is_override_gate: true,
+                    matched_line: Some(line.trim().to_string()),
                 });
                 found_exec = true;
                 continue;
@@ -252,6 +254,7 @@ fn analyze_variable_resolution(
                     i + 1
                 ),
                 is_override_gate: false,
+                matched_line: Some(line.trim().to_string()),
             });
             found_cmd = true;
         }
@@ -297,6 +300,10 @@ fn analyze_indirect_execution(
         if let Ok(re) = Regex::new(&pattern)
             && re.is_match(content)
         {
+            let matched_line = content
+                .lines()
+                .find(|line| re.is_match(line))
+                .map(|line| line.trim().to_string());
             return vec![Signal {
                 id: "SA-INDIRECT-EXEC".to_string(),
                 category: SignalCategory::Pkgbuild,
@@ -306,6 +313,7 @@ fn analyze_indirect_execution(
                     var_name, cmd
                 ),
                 is_override_gate: false,
+                matched_line,
             }];
         }
     }
@@ -330,6 +338,7 @@ fn analyze_charbychar_construction(content: &str) -> Vec<Signal> {
                     i + 1
                 ),
                 is_override_gate: false,
+                matched_line: Some(line.trim().to_string()),
             }];
         }
     }
@@ -340,9 +349,22 @@ fn analyze_charbychar_construction(content: &str) -> Vec<Signal> {
 fn analyze_data_blobs(content: &str) -> Vec<Signal> {
     let mut signals = Vec::new();
 
+    let mut in_checksum_block = false;
+
     for line in content.lines() {
-        // Skip checksum array lines
-        if CHECKSUM_LINE_RE.is_match(line) {
+        // Track whether we're inside a checksum array block
+        if CHECKSUM_ARRAY_OPEN_RE.is_match(line) {
+            in_checksum_block = true;
+        }
+
+        // Skip checksum array lines (both declaration and value lines)
+        let skip = in_checksum_block || CHECKSUM_LINE_RE.is_match(line);
+
+        if in_checksum_block && line.contains(')') {
+            in_checksum_block = false;
+        }
+
+        if skip {
             continue;
         }
 
@@ -356,6 +378,7 @@ fn analyze_data_blobs(content: &str) -> Vec<Signal> {
                 points: 50,
                 description: "embedded long hex string (possible encoded payload)".to_string(),
                 is_override_gate: false,
+                matched_line: Some(line.trim().to_string()),
             });
         }
 
@@ -372,6 +395,7 @@ fn analyze_data_blobs(content: &str) -> Vec<Signal> {
                     description: "embedded long base64 string (possible encoded payload)"
                         .to_string(),
                     is_override_gate: false,
+                    matched_line: Some(line.trim().to_string()),
                 });
             }
         }
@@ -415,6 +439,7 @@ fn analyze_heredoc_entropy(content: &str) -> Vec<Signal> {
                             body.len()
                         ),
                         is_override_gate: false,
+                        matched_line: None,
                     }];
                 }
             }
@@ -459,12 +484,17 @@ fn analyze_binary_download(content: &str) -> Vec<Signal> {
         return Vec::new();
     }
 
+    let matched_line = content
+        .lines()
+        .find(|line| DOWNLOAD_TO_FILE_RE.is_match(line))
+        .map(|line| line.trim().to_string());
     vec![Signal {
         id: "SA-BINARY-DOWNLOAD-NOCOMPILE".to_string(),
         category: SignalCategory::Pkgbuild,
         points: 60,
         description: "downloads file and chmod +x with no compilation step".to_string(),
         is_override_gate: false,
+        matched_line,
     }]
 }
 
@@ -712,5 +742,22 @@ package() {
 "#,
         );
         assert!(ids.is_empty(), "benign PKGBUILD should trigger no signals, got: {ids:?}");
+    }
+
+    // --- SHA-512 checksum false positive regression ---
+
+    #[test]
+    fn data_blob_sha512_not_flagged() {
+        let sha512 = "a1".repeat(64); // exactly 128 hex chars = SHA-512
+        let ids = analyze(&format!("sha512sums=('{sha512}')"));
+        assert!(!has(&ids, "SA-DATA-BLOB-HEX"), "SHA-512 checksum should not trigger");
+    }
+
+    #[test]
+    fn data_blob_sha512_multiline_not_flagged() {
+        let sha512 = "a1".repeat(64);
+        let content = format!("sha512sums=('{sha512}'\n            '{sha512}')");
+        let ids = analyze(&content);
+        assert!(!has(&ids, "SA-DATA-BLOB-HEX"), "SHA-512 in multi-line array should not trigger");
     }
 }

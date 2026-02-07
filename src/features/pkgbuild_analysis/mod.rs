@@ -7,10 +7,6 @@ use crate::shared::scoring::{Signal, SignalCategory};
 pub struct PkgbuildAnalysis;
 
 impl Feature for PkgbuildAnalysis {
-    fn name(&self) -> &str {
-        "pkgbuild_analysis"
-    }
-
     fn analyze(&self, ctx: &PackageContext) -> Vec<Signal> {
         let Some(ref content) = ctx.pkgbuild_content else {
             return Vec::new();
@@ -21,12 +17,17 @@ impl Feature for PkgbuildAnalysis {
 
         for pat in compiled {
             if pat.regex.is_match(content) {
+                let matched_line = content
+                    .lines()
+                    .find(|line| pat.regex.is_match(line))
+                    .map(|line| line.trim().to_string());
                 signals.push(Signal {
                     id: pat.id.clone(),
                     category: SignalCategory::Pkgbuild,
                     points: pat.points,
                     description: pat.description.clone(),
                     is_override_gate: pat.override_gate,
+                    matched_line,
                 });
             }
         }
@@ -626,5 +627,45 @@ package() {
 }
 "#);
         assert!(ids.is_empty(), "Benign PKGBUILD should trigger no signals, got: {ids:?}");
+    }
+
+    // --- SUID false positive regression ---
+
+    #[test]
+    fn suid_bit_4digit() {
+        let ids = analyze("chmod 4755 /usr/bin/evil");
+        assert!(has(&ids, "P-SUID-BIT"));
+    }
+
+    #[test]
+    fn suid_bit_sgid() {
+        let ids = analyze("chmod 2755 /usr/bin/evil");
+        assert!(has(&ids, "P-SUID-BIT"));
+    }
+
+    #[test]
+    fn chmod_755_no_suid() {
+        let ids = analyze("chmod 755 /usr/bin/tool");
+        assert!(!has(&ids, "P-SUID-BIT"), "chmod 755 should not trigger SUID, got: {ids:?}");
+    }
+
+    #[test]
+    fn chmod_644_no_suid() {
+        let ids = analyze("chmod 644 /usr/share/file");
+        assert!(!has(&ids, "P-SUID-BIT"), "chmod 644 should not trigger SUID, got: {ids:?}");
+    }
+
+    #[test]
+    fn find_chmod_755_no_suid() {
+        let ids = analyze(r#"find "${pkgdir}" -type d -exec chmod 755 {} +"#);
+        assert!(!has(&ids, "P-SUID-BIT"), "find chmod 755 should not trigger SUID, got: {ids:?}");
+    }
+
+    // --- Crypto wallet false positive regression ---
+
+    #[test]
+    fn crypto_wallet_sha256_no_signal() {
+        let ids = analyze("'cf5438cf5dbbc10d9b17cad5655e2fb1f15d5196755ea0b3ecbee81b2c8682fe')");
+        assert!(!has(&ids, "P-CRYPTO-WALLET"), "SHA256 hash should not trigger crypto wallet, got: {ids:?}");
     }
 }
