@@ -7,10 +7,7 @@ ALPM hook integration for paru/yay.
 ## Install
 
 ```bash
-cargo build --release
-sudo install -Dm755 target/release/traur /usr/bin/traur
-sudo install -Dm755 target/release/traur-hook /usr/bin/traur-hook
-sudo install -Dm644 hook/traur.hook /usr/share/libalpm/hooks/traur.hook
+paru -S traur
 ```
 
 ## Usage
