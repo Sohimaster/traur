@@ -44,19 +44,6 @@ enum Commands {
         #[arg(short = 'a', long)]
         all: bool,
     },
-    /// Show detailed signal breakdown for a package
-    Report {
-        /// Package name
-        package: String,
-
-        /// Output as JSON
-        #[arg(long)]
-        json: bool,
-
-        /// Show the exact line that triggered each signal
-        #[arg(short = 'v', long)]
-        verbose: bool,
-    },
     /// Whitelist a package (skip future scans)
     Allow {
         /// Package name to whitelist
@@ -87,7 +74,6 @@ fn main() {
             verbose,
             all,
         } => cmd_scan(package, pkgbuild, all_installed, jobs, json, verbose, all),
-        Commands::Report { package, json, verbose } => cmd_report(&package, json, verbose),
         Commands::Allow { package } => cmd_allow(&package),
         Commands::Bench { count, jobs } => bench::run(count, jobs),
     };
@@ -319,16 +305,6 @@ fn get_installed_aur_packages() -> Result<Vec<String>, String> {
         .collect();
 
     Ok(names)
-}
-
-fn cmd_report(package: &str, json: bool, verbose: bool) -> i32 {
-    match coordinator::scan_package(package, json, verbose) {
-        Ok(_) => 0,
-        Err(e) => {
-            eprintln!("Error: {e}");
-            1
-        }
-    }
 }
 
 fn cmd_allow(package: &str) -> i32 {

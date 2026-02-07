@@ -18,7 +18,6 @@ paru -S traur
 ```bash
 traur scan                # scan all installed aur packages
 traur scan <package>      # scan a package
-traur report <package>    # detailed signal breakdown
 traur allow <package>     # whitelist a package
 traur bench               # benchmark 1000 latest AUR packages
 ```
