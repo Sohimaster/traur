@@ -139,13 +139,35 @@ impl Feature for NameAnalysis {
                 continue;
             }
             let dist = levenshtein(name, top);
-            if dist > 0 && dist <= 2 {
+            if dist == 1 {
                 signals.push(Signal {
                     id: "B-TYPOSQUAT".to_string(),
                     category: SignalCategory::Behavioral,
                     points: 55,
                     description: format!(
                         "Name '{name}' is {dist} edit(s) away from popular package '{top}'"
+                    ),
+                    is_override_gate: false,
+                    matched_line: None,
+                });
+                break;
+            }
+        }
+
+        // Check if name embeds a popular package as prefix/suffix (no hyphen boundary)
+        for top in TOP_PACKAGES.iter() {
+            if name == top.as_str() || name.len() <= top.len() {
+                continue;
+            }
+            let is_prefix = name.starts_with(top.as_str());
+            let is_suffix = name.ends_with(top.as_str());
+            if is_prefix || is_suffix {
+                signals.push(Signal {
+                    id: "B-TYPOSQUAT".to_string(),
+                    category: SignalCategory::Behavioral,
+                    points: 55,
+                    description: format!(
+                        "Name '{name}' embeds popular package '{top}'"
                     ),
                     is_override_gate: false,
                     matched_line: None,
@@ -187,9 +209,17 @@ mod tests {
     }
 
     #[test]
-    fn typosquat() {
-        assert!(has(&analyze("yya"), "B-TYPOSQUAT")); // 2 edits from "yay"
+    fn typosquat_edit_distance() {
         assert!(has(&analyze("pary"), "B-TYPOSQUAT")); // 1 edit from "paru"
+        assert!(!has(&analyze("rad"), "B-TYPOSQUAT"), "2 edits from 'yay', should not flag");
+    }
+
+    #[test]
+    fn typosquat_containment() {
+        assert!(has(&analyze("yay2"), "B-TYPOSQUAT")); // prefix
+        assert!(has(&analyze("2vim"), "B-TYPOSQUAT")); // suffix
+        assert!(has(&analyze("yay-bin"), "B-TYPOSQUAT")); // prefix with hyphen
+        assert!(!has(&analyze("myay-bin"), "B-TYPOSQUAT"), "No prefix/suffix match");
     }
 
     #[test]
