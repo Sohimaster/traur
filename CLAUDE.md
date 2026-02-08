@@ -72,6 +72,7 @@ Use `/release <version>` in Claude Code to run the full release workflow (bump v
 | `src/shared/aur_rpc.rs` | AUR RPC v5 API client |
 | `src/shared/aur_git.rs` | Git clone/pull/diff operations |
 | `src/shared/bulk.rs` | Batch metadata fetch, maintainer prefetch, clone-with-retry |
+| `src/features/orphan_takeover_analysis/` | Submitter != maintainer detection, orphan takeover composite signal |
 | `src/features/shell_analysis/` | Beyond-regex static analysis (var concat, indirect exec, char-by-char, data blobs, binary download) |
 | `src/features/gtfobins_analysis/` | GTFOBins-derived patterns (117 patterns for legitimate binary abuse) |
 | `data/patterns.toml` | Regex pattern database (239 patterns) |

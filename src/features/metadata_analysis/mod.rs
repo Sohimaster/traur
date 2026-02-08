@@ -115,7 +115,9 @@ mod tests {
             popularity,
             out_of_date,
             maintainer: maintainer.map(|s| s.to_string()),
+            submitter: None,
             first_submitted: now - 86400, // 1 day ago
+            last_modified: now,
             license,
         }
     }

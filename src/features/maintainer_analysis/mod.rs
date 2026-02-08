@@ -84,7 +84,9 @@ mod tests {
             popularity: 0.0,
             out_of_date: None,
             maintainer: Some("testuser".into()),
+            submitter: None,
             first_submitted,
+            last_modified: first_submitted,
             license: None,
         }
     }

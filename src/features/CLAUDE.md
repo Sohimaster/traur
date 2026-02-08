@@ -25,6 +25,7 @@ Each signal should populate `matched_line: Option<String>` with the exact trigge
 | `metadata_analysis` | AUR metadata red flags | Metadata | 0.15 |
 | `name_analysis` | Typosquatting and impersonation | Behavioral | 0.25 |
 | `maintainer_analysis` | Maintainer reputation signals | Behavioral | 0.25 |
+| `orphan_takeover_analysis` | Submitter != maintainer, orphan takeover pattern | Behavioral | 0.25 |
 | `git_history_analysis` | Temporal signals from git history | Temporal | 0.15 |
 | `shell_analysis` | Beyond-regex obfuscation (var concat, indirect exec, char-by-char, data blobs, binary download) | Pkgbuild | 0.45 |
 | `gtfobins_analysis` | GTFOBins-derived patterns (reverse shells, pipe-to-interpreter, non-obvious exec) | Pkgbuild | 0.45 |

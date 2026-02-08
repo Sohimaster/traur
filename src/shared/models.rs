@@ -23,7 +23,9 @@ pub struct AurPackage {
     pub popularity: f64,
     pub out_of_date: Option<u64>,
     pub maintainer: Option<String>,
+    pub submitter: Option<String>,
     pub first_submitted: u64,
+    pub last_modified: u64,
     pub license: Option<Vec<String>>,
 }
 

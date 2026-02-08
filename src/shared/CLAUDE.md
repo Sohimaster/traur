@@ -6,7 +6,7 @@ Reusable modules consumed by features and the coordinator. Code goes here if it'
 
 | Module | Purpose | Used by |
 |--------|---------|---------|
-| `models.rs` | `PackageContext`, `AurPackage`, `GitCommit` structs | All features |
+| `models.rs` | `PackageContext`, `AurPackage` (with `submitter`, `last_modified`), `GitCommit` structs | All features |
 | `aur_rpc.rs` | AUR RPC v5 API client (reqwest, blocking) | coordinator, metadata, maintainer, name features |
 | `aur_git.rs` | Git clone/pull/diff/log operations | coordinator, pkgbuild, install_script, git_history features |
 | `scoring.rs` | `Signal`, `SignalCategory`, `Tier`, `ScanResult`, `compute_score()` | coordinator |
