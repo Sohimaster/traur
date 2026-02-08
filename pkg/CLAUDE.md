@@ -1,29 +1,32 @@
 # Package
 
-AUR distribution files.
+AUR distribution files. Follows [Rust package guidelines](https://wiki.archlinux.org/title/Rust_package_guidelines).
 
-## PKGBUILD
+## PKGBUILDs
 
-Standard Rust AUR package. Builds two binaries (`traur` and `traur-hook`), installs the ALPM hook and pattern database.
+- `PKGBUILD` — source package (`traur`). Uses `prepare()` with `--locked`, `build()` with `--frozen`, `check()` with `cargo test --frozen`.
+- `PKGBUILD-bin` — binary package (`traur-bin`). Downloads prebuilt tarball from GitHub releases.
 
-### Release workflow
+Both install LICENSE to `/usr/share/licenses/`.
 
-1. Update `pkgver` in PKGBUILD and `Cargo.toml`
-2. Create a git tag: `git tag v0.1.0`
-3. Push tag to GitHub: `git push --tags`
-4. Update `sha256sums` in PKGBUILD: `makepkg -g`
-5. Test locally: `makepkg -si`
-6. Update AUR repo:
-   ```bash
-   cd /path/to/aur/traur
-   cp /path/to/traur/pkg/PKGBUILD .
-   makepkg --printsrcinfo > .SRCINFO
-   git add PKGBUILD .SRCINFO
-   git commit -m "Update to v0.1.0"
-   git push
-   ```
+## Release workflow
 
-### Installed files
+Run `/release <version>` in Claude Code. This automates:
+
+1. Validate version, run tests, build release
+2. Bump version in Cargo.toml and both PKGBUILDs (reset pkgrel=1)
+3. Commit, tag, push to GitHub
+4. Create release tarball and GitHub release
+5. Update sha256sums, commit, push
+6. Sync `aur/` and `aur-bin/` repos (copy PKGBUILD, generate .SRCINFO, push to AUR)
+
+## AUR repos
+
+Both live as subdirectories with their own git remotes:
+- `aur/` → `ssh://aur@aur.archlinux.org/traur.git` (master branch)
+- `aur-bin/` → `ssh://aur@aur.archlinux.org/traur-bin.git` (master branch)
+
+## Installed files
 
 | File | Path |
 |------|------|
@@ -31,3 +34,4 @@ Standard Rust AUR package. Builds two binaries (`traur` and `traur-hook`), insta
 | Hook binary | `/usr/bin/traur-hook` |
 | ALPM hook | `/usr/share/libalpm/hooks/traur.hook` |
 | Pattern DB | `/usr/share/traur/patterns.toml` |
+| License | `/usr/share/licenses/traur/LICENSE` |

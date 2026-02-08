@@ -1,6 +1,6 @@
 # traur - Pre-install Trust Scoring for AUR Packages
 
-Scores AUR packages before you install them. ALPM hook integration for paru/yay.
+Scores AUR packages before you install them. ALPM hook for pre-install scanning.
 
 ## Architecture
 
@@ -57,6 +57,10 @@ sudo install -Dm644 hook/traur.hook /usr/share/libalpm/hooks/traur.hook
 ## Adding new detection patterns
 
 Edit `data/patterns.toml`. Each pattern has: `id`, `pattern` (regex), `points`, `description`, `override_gate` (bool). Patterns are grouped by feature section name.
+
+## Release
+
+Use `/release <version>` in Claude Code to run the full release workflow (bump version, build, GitHub release, update sha256sums, push to both AUR repos).
 
 ## Key files
 

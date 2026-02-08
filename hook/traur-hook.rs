@@ -8,6 +8,7 @@
 
 use std::fs::OpenOptions;
 use std::io::{self, BufRead, BufReader, Write};
+use std::collections::HashSet;
 use std::process::Command;
 use colored::Colorize;
 use traur::coordinator;
@@ -34,10 +35,11 @@ fn main() {
         return;
     }
 
-    // Filter to AUR-only packages
+    // Filter to AUR-only packages (single pacman -Sl call instead of per-package -Si)
+    let official = official_repo_packages();
     let aur_packages: Vec<String> = packages
         .into_iter()
-        .filter(|pkg| !is_in_official_repos(pkg))
+        .filter(|pkg| !official.contains(pkg.as_str()))
         .collect();
 
     if aur_packages.is_empty() {
@@ -145,12 +147,17 @@ fn main() {
     }
 }
 
-/// Check if a package exists in the official sync databases.
-fn is_in_official_repos(pkg_name: &str) -> bool {
+/// Get all package names from official sync databases in one call.
+/// Output format: "repo package_name version [installed]"
+fn official_repo_packages() -> HashSet<String> {
     Command::new("pacman")
-        .args(["-Si", pkg_name])
-        .stdout(std::process::Stdio::null())
-        .stderr(std::process::Stdio::null())
-        .status()
-        .is_ok_and(|s| s.success())
+        .arg("-Sl")
+        .output()
+        .map(|out| {
+            String::from_utf8_lossy(&out.stdout)
+                .lines()
+                .filter_map(|line| line.split_whitespace().nth(1).map(String::from))
+                .collect()
+        })
+        .unwrap_or_default()
 }

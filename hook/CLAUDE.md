@@ -9,7 +9,7 @@ ALPM (pacman) hook integration for automatic pre-install scanning.
 
 ## How it works
 
-1. pacman/paru triggers the hook before any Install or Upgrade transaction
+1. pacman triggers the hook before any Install or Upgrade transaction
 2. ALPM passes matched package names to `traur-hook` via stdin (one per line)
 3. `traur-hook` filters out official repo packages using `pacman -Si`
 4. Remaining AUR packages are scanned with `traur scan <pkg>`
