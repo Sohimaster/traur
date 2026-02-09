@@ -29,6 +29,7 @@ Each signal should populate `matched_line: Option<String>` with the exact trigge
 | `git_history_analysis` | Temporal signals from git history | Temporal | 0.15 |
 | `shell_analysis` | Beyond-regex obfuscation (var concat, indirect exec, char-by-char, data blobs, binary download) | Pkgbuild | 0.45 |
 | `gtfobins_analysis` | GTFOBins-derived patterns (reverse shells, pipe-to-interpreter, non-obvious exec) | Pkgbuild | 0.45 |
+| `bin_source_verification` | -bin package source domain vs upstream URL mismatch | Behavioral | 0.25 |
 
 ## Adding a new feature
 

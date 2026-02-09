@@ -1,3 +1,4 @@
+pub mod bin_source_verification;
 pub mod checksum_analysis;
 pub mod git_history_analysis;
 pub mod gtfobins_analysis;
@@ -33,5 +34,6 @@ pub fn all_features() -> Vec<Box<dyn Feature>> {
         Box::new(git_history_analysis::GitHistoryAnalysis),
         Box::new(shell_analysis::ShellAnalysis),
         Box::new(gtfobins_analysis::GtfobinsAnalysis),
+        Box::new(bin_source_verification::BinSourceVerification),
     ]
 }
