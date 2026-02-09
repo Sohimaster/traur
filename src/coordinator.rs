@@ -33,34 +33,25 @@ pub fn build_context(package_name: &str) -> Result<PackageContext, String> {
     let git_cache = cache::git_cache_dir();
     let cache_str = git_cache.to_str().unwrap_or("/tmp/traur-git");
 
-    let (pkgbuild_content, install_script_content, git_log, prior_pkgbuild_content) =
-        match aur_git::ensure_repo(package_base, cache_str) {
-            Ok(repo_path) => {
-                let pkgbuild = aur_git::read_pkgbuild(&repo_path).ok();
-                let install = pkgbuild
-                    .as_deref()
-                    .and_then(|content| aur_git::read_install_script(&repo_path, content));
-                let mut log = aur_git::read_git_log(&repo_path, 20);
+    let repo_path = aur_git::ensure_repo(package_base, cache_str)?;
 
-                // Attach diff to the latest commit
-                if let Some(first) = log.first_mut() {
-                    first.diff = aur_git::get_latest_diff(&repo_path);
-                }
+    let pkgbuild_content = aur_git::read_pkgbuild(&repo_path).ok();
+    let install_script_content = pkgbuild_content
+        .as_deref()
+        .and_then(|content| aur_git::read_install_script(&repo_path, content));
+    let mut git_log = aur_git::read_git_log(&repo_path, 20);
 
-                // Read prior PKGBUILD for diff comparison
-                let prior = if log.len() >= 2 {
-                    aur_git::read_pkgbuild_at_revision(&repo_path, "HEAD~1")
-                } else {
-                    None
-                };
+    // Attach diff to the latest commit
+    if let Some(first) = git_log.first_mut() {
+        first.diff = aur_git::get_latest_diff(&repo_path);
+    }
 
-                (pkgbuild, install, log, prior)
-            }
-            Err(e) => {
-                eprintln!("Warning: failed to clone AUR repo for {package_base}: {e}");
-                (None, None, Vec::new(), None)
-            }
-        };
+    // Read prior PKGBUILD for diff comparison
+    let prior_pkgbuild_content = if git_log.len() >= 2 {
+        aur_git::read_pkgbuild_at_revision(&repo_path, "HEAD~1")
+    } else {
+        None
+    };
 
     // Fetch maintainer's other packages for reputation analysis
     let maintainer_packages = metadata

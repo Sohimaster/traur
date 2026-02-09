@@ -1,8 +1,10 @@
 use crate::shared::models::GitCommit;
 use std::path::PathBuf;
-use std::process::Command;
+use std::process::{Command, Output, Stdio};
+use std::time::{Duration, Instant};
 
 const AUR_GIT_BASE: &str = "https://aur.archlinux.org";
+const GIT_TIMEOUT: Duration = Duration::from_secs(30);
 
 /// Clone or update the AUR git repo for a package. Returns the local path.
 pub fn ensure_repo(package_base: &str, cache_dir: &str) -> Result<PathBuf, String> {
@@ -10,11 +12,11 @@ pub fn ensure_repo(package_base: &str, cache_dir: &str) -> Result<PathBuf, Strin
 
     if repo_path.join(".git").exists() {
         // Pull latest
-        let output = Command::new("git")
-            .args(["pull", "--ff-only"])
-            .current_dir(&repo_path)
-            .output()
-            .map_err(|e| format!("git pull failed: {e}"))?;
+        let output = run_with_timeout(
+            Command::new("git")
+                .args(["pull", "--ff-only"])
+                .current_dir(&repo_path),
+        )?;
 
         if !output.status.success() {
             let stderr = String::from_utf8_lossy(&output.stderr);
@@ -23,10 +25,10 @@ pub fn ensure_repo(package_base: &str, cache_dir: &str) -> Result<PathBuf, Strin
     } else {
         // Shallow clone
         let url = format!("{AUR_GIT_BASE}/{package_base}.git");
-        let output = Command::new("git")
-            .args(["clone", "--depth=50", &url, repo_path.to_str().unwrap()])
-            .output()
-            .map_err(|e| format!("git clone failed: {e}"))?;
+        let output = run_with_timeout(
+            Command::new("git")
+                .args(["clone", "--depth=50", &url, repo_path.to_str().unwrap()]),
+        )?;
 
         if !output.status.success() {
             let stderr = String::from_utf8_lossy(&output.stderr);
@@ -35,6 +37,39 @@ pub fn ensure_repo(package_base: &str, cache_dir: &str) -> Result<PathBuf, Strin
     }
 
     Ok(repo_path)
+}
+
+/// Run a command with a timeout. Kills the process if it exceeds GIT_TIMEOUT.
+fn run_with_timeout(cmd: &mut Command) -> Result<Output, String> {
+    let mut child = cmd
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .map_err(|e| format!("failed to spawn git: {e}"))?;
+
+    let start = Instant::now();
+
+    loop {
+        match child.try_wait() {
+            Ok(Some(_)) => {
+                return child
+                    .wait_with_output()
+                    .map_err(|e| format!("git failed: {e}"));
+            }
+            Ok(None) => {
+                if start.elapsed() > GIT_TIMEOUT {
+                    let _ = child.kill();
+                    let _ = child.wait();
+                    return Err(format!(
+                        "git operation timed out after {}s",
+                        GIT_TIMEOUT.as_secs()
+                    ));
+                }
+                std::thread::sleep(Duration::from_millis(200));
+            }
+            Err(e) => return Err(format!("failed to wait for git: {e}")),
+        }
+    }
 }
 
 /// Read PKGBUILD content from a cloned repo.

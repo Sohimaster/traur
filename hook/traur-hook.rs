@@ -56,6 +56,7 @@ fn main() {
     let config = config::load_config();
     let mut has_critical = false;
     let mut has_high = false;
+    let mut has_scan_error = false;
     let mut any_scanned = false;
 
     let _ = writeln!(
@@ -90,8 +91,8 @@ fn main() {
                 }
             }
             Err(e) => {
-                let _ = writeln!(tty, "traur: failed to scan '{pkg}': {e}");
-                // Fail open on scan errors
+                let _ = writeln!(tty, "{}", format!("traur: failed to scan '{pkg}': {e}").red());
+                has_scan_error = true;
             }
         }
     }
@@ -110,6 +111,20 @@ fn main() {
         let _ = writeln!(
             tty,
             "traur: use 'traur allow <package>' to whitelist, then retry"
+        );
+        std::process::exit(1);
+    }
+
+    if has_scan_error {
+        let _ = writeln!(tty);
+        let _ = writeln!(
+            tty,
+            "{}",
+            "traur: scan errors occurred — blocking transaction".red().bold()
+        );
+        let _ = writeln!(
+            tty,
+            "traur: use 'traur allow <package>' to whitelist failed packages, then retry"
         );
         std::process::exit(1);
     }
