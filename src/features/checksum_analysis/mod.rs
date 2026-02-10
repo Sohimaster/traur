@@ -91,9 +91,9 @@ impl Feature for ChecksumAnalysis {
                         signals.push(Signal {
                             id: "P-CHECKSUM-MISMATCH".to_string(),
                             category: SignalCategory::Pkgbuild,
-                            points: 40,
+                            points: 25,
                             description: format!(
-                                "{source_name} count ({src_count}) != {checksum_name} count ({cksum_count})"
+                                "checksum count mismatch: {source_name} has {src_count} entries but {checksum_name} has {cksum_count}"
                             ),
                             is_override_gate: false,
                             matched_line: None,
@@ -212,6 +212,23 @@ mod tests {
     }
 
     // --- Arch-specific array false positive regression ---
+
+    #[test]
+    fn checksum_mismatch_points_and_wording() {
+        let ctx = PackageContext {
+            name: "test-pkg".into(),
+            metadata: None,
+            pkgbuild_content: Some("source=('a.tar.gz' 'b.tar.gz')\nsha256sums=('abc123')\n".into()),
+            install_script_content: None,
+            prior_pkgbuild_content: None,
+            git_log: vec![],
+            maintainer_packages: vec![],
+        };
+        let signals = ChecksumAnalysis.analyze(&ctx);
+        let mismatch = signals.iter().find(|s| s.id == "P-CHECKSUM-MISMATCH").unwrap();
+        assert_eq!(mismatch.points, 25);
+        assert!(mismatch.description.contains("checksum count mismatch"));
+    }
 
     #[test]
     fn checksum_arch_specific_no_mismatch() {

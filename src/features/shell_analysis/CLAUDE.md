@@ -5,7 +5,7 @@ Lightweight static analysis of PKGBUILD and install scripts that goes beyond reg
 ## What it detects
 
 ### Variable Resolution (SA-VAR-CONCAT-EXEC, SA-VAR-CONCAT-CMD)
-Tracks variable assignments (`VAR=value`) and resolves `$VAR`/`${VAR}` references. Detects when concatenated fragments form dangerous commands (e.g., `a=cu;b=rl;$a$b | bash`). Override gate fires for download-and-execute patterns.
+Tracks variable assignments (`VAR=value`) and resolves `$VAR`/`${VAR}` references. SA-VAR-CONCAT-EXEC detects download-and-execute pipes assembled from variables (override gate). SA-VAR-CONCAT-CMD only fires when a dangerous command is assembled from 2+ variable fragments (genuine concatenation obfuscation like `a=cu;b=rl;$a$b`); single-variable-holds-command cases are handled by SA-INDIRECT-EXEC instead. Uses word boundary matching to prevent substring false positives.
 
 ### Indirect Execution (SA-INDIRECT-EXEC)
 Detects variables holding dangerous command names (`bash`, `curl`, `python`, etc.) used in execution position (after `|`, at line start, after `;`/`&&`/`||`).

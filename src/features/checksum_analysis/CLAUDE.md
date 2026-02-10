@@ -7,7 +7,7 @@ Verifies integrity of source checksum declarations in PKGBUILDs.
 - **No checksums**: No checksum array at all (P-NO-CHECKSUMS, +30)
 - **All SKIP**: Every entry in every checksum array is 'SKIP' on non-VCS packages (P-SKIP-ALL, +25). Properly parses multi-entry arrays.
 - **Weak algorithms**: md5sums or sha1sums without stronger alternative (P-WEAK-CHECKSUMS, +10)
-- **Count mismatch**: Source count != checksum count (P-CHECKSUM-MISMATCH, +40)
+- **Count mismatch**: Source count != checksum count (P-CHECKSUM-MISMATCH, +25). Compares per arch-suffix independently.
 
 ## Signals emitted
 
