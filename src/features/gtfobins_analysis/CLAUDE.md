@@ -29,7 +29,11 @@ The following GTFOBins patterns were evaluated and excluded:
 
 ## Signal IDs
 
-All signal IDs use the `G-` prefix. Override gates are set for patterns that are unambiguously malicious (reverse shells, download-and-execute pipes, tar checkpoint exec).
+All signal IDs use the `G-` prefix for PKGBUILD matches and `IS-G-` prefix for install script matches. Override gates are set for patterns that are unambiguously malicious (reverse shells, download-and-execute pipes, tar checkpoint exec).
+
+## Scope
+
+Runs all 117 patterns against both `pkgbuild_content` and `install_script_content`.
 
 ## Category
 

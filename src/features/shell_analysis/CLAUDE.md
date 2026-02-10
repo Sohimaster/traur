@@ -1,6 +1,6 @@
 # Shell Analysis
 
-Lightweight static analysis of PKGBUILD shell scripts that goes beyond regex pattern matching. Catches obfuscation techniques that regex fundamentally cannot detect.
+Lightweight static analysis of PKGBUILD and install scripts that goes beyond regex pattern matching. Catches obfuscation techniques that regex fundamentally cannot detect. Runs all sub-analyzers on both `pkgbuild_content` and `install_script_content`.
 
 ## What it detects
 
@@ -32,7 +32,7 @@ Flags when a PKGBUILD downloads a file (`curl -o`/`wget -O`) and `chmod +x` it w
 | SA-HIGH-ENTROPY-HEREDOC | 55 | no | High-entropy heredoc content |
 | SA-BINARY-DOWNLOAD-NOCOMPILE | 60 | no | Download + chmod +x, no compilation |
 
-All signals use `SignalCategory::Pkgbuild` (weight 0.45).
+All signals use `SignalCategory::Pkgbuild` (weight 0.45). Install script signals use the same IDs with `IS-` prefix (e.g., `IS-SA-VAR-CONCAT-EXEC`).
 
 ## Design decisions
 
@@ -44,3 +44,4 @@ All signals use `SignalCategory::Pkgbuild` (weight 0.45).
 ## Dependencies
 
 - `PackageContext.pkgbuild_content` — the PKGBUILD content to analyze
+- `PackageContext.install_script_content` — the .install file content to analyze

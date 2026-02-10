@@ -8,6 +8,15 @@ const GIT_TIMEOUT: Duration = Duration::from_secs(30);
 
 /// Clone or update the AUR git repo for a package. Returns the local path.
 pub fn ensure_repo(package_base: &str, cache_dir: &str) -> Result<PathBuf, String> {
+    if package_base.is_empty()
+        || !package_base
+            .chars()
+            .all(|c| c.is_ascii_alphanumeric() || matches!(c, '-' | '_' | '.' | '+' | '@'))
+        || package_base.contains("..")
+    {
+        return Err(format!("invalid package name: {package_base}"));
+    }
+
     let repo_path = PathBuf::from(cache_dir).join(package_base);
 
     if repo_path.join(".git").exists() {
@@ -179,5 +188,40 @@ pub fn get_latest_diff(repo_path: &std::path::Path) -> Option<String> {
         Some(String::from_utf8_lossy(&output.stdout).to_string())
     } else {
         None
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn rejects_path_traversal() {
+        assert!(ensure_repo("../../etc/shadow", "/tmp").is_err());
+    }
+
+    #[test]
+    fn rejects_slash() {
+        assert!(ensure_repo("foo/bar", "/tmp").is_err());
+    }
+
+    #[test]
+    fn rejects_empty() {
+        assert!(ensure_repo("", "/tmp").is_err());
+    }
+
+    #[test]
+    fn accepts_valid_package_name() {
+        // Should pass validation — may succeed or fail on clone, but not on validation
+        if let Err(e) = ensure_repo("yay", "/tmp/traur-test-nonexistent") {
+            assert!(!e.contains("invalid package name"), "valid name rejected: {e}");
+        }
+    }
+
+    #[test]
+    fn accepts_complex_valid_name() {
+        if let Err(e) = ensure_repo("lib32-mesa+utils", "/tmp/traur-test-nonexistent") {
+            assert!(!e.contains("invalid package name"), "valid name rejected: {e}");
+        }
     }
 }

