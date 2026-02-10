@@ -144,7 +144,7 @@ fn cmd_scan_all_installed(jobs: usize, json: bool, verbose: bool, all: bool) -> 
     use rayon::prelude::*;
     use std::sync::atomic::{AtomicU64, Ordering};
 
-    let names = match get_installed_aur_packages() {
+    let mut names = match get_installed_aur_packages() {
         Ok(names) if names.is_empty() => {
             eprintln!("No AUR packages installed.");
             return 0;
@@ -156,15 +156,22 @@ fn cmd_scan_all_installed(jobs: usize, json: bool, verbose: bool, all: bool) -> 
         }
     };
 
+    eprintln!("  Fetching package metadata for {} installed packages...", names.len());
+    let metadata = batch_fetch_metadata(&names);
+    let not_found: Vec<&str> = names
+        .iter()
+        .filter(|n| !metadata.contains_key(n.as_str()))
+        .map(|n| n.as_str())
+        .collect();
+    if !not_found.is_empty() {
+        eprintln!("  Skipping {} not on AUR: {}", not_found.len(), not_found.join(", "));
+        names.retain(|n| metadata.contains_key(n.as_str()));
+    }
     let total = names.len();
     eprintln!(
         "{}",
-        format!("Scanning {} installed AUR packages...", total).bold()
+        format!("Scanning {} AUR packages...", total).bold()
     );
-
-    eprintln!("  Fetching package metadata...");
-    let metadata = batch_fetch_metadata(&names);
-    eprintln!("  Got metadata for {}/{} packages", metadata.len(), total);
 
     let maintainer_packages = prefetch_maintainer_packages(&metadata);
 
@@ -218,7 +225,8 @@ fn cmd_scan_all_installed(jobs: usize, json: bool, verbose: bool, all: bool) -> 
                         flagged.lock().unwrap().push(scan);
                     }
                 }
-                Err(_) => {
+                Err(e) => {
+                    eprintln!("  error: {name}: {e}");
                     error_count.fetch_add(1, Ordering::Relaxed);
                 }
             }
