@@ -79,8 +79,16 @@ pub fn is_whitelisted_in(config: &Config, package: &str) -> bool {
 
 pub fn config_path() -> std::path::PathBuf {
     if let Ok(xdg) = std::env::var("XDG_CONFIG_HOME") {
-        std::path::PathBuf::from(xdg).join("traur").join("config.toml")
-    } else if let Ok(home) = std::env::var("HOME") {
+        return std::path::PathBuf::from(xdg).join("traur").join("config.toml");
+    }
+
+    // When running under sudo/doas (e.g. ALPM hook), resolve the invoking
+    // user's home so we read *their* config instead of /root's.
+    if let Some(home) = calling_user_home() {
+        return home.join(".config").join("traur").join("config.toml");
+    }
+
+    if let Ok(home) = std::env::var("HOME") {
         std::path::PathBuf::from(home)
             .join(".config")
             .join("traur")
@@ -88,4 +96,25 @@ pub fn config_path() -> std::path::PathBuf {
     } else {
         std::path::PathBuf::from("/etc/traur/config.toml")
     }
+}
+
+/// Resolve the invoking user's home directory when running under sudo or doas.
+fn calling_user_home() -> Option<std::path::PathBuf> {
+    let user = std::env::var("SUDO_USER")
+        .or_else(|_| std::env::var("DOAS_USER"))
+        .ok()?;
+
+    if user == "root" {
+        return None;
+    }
+
+    let output = std::process::Command::new("getent")
+        .args(["passwd", &user])
+        .output()
+        .ok()?;
+
+    let line = String::from_utf8(output.stdout).ok()?;
+    // getent passwd format: name:x:uid:gid:gecos:home:shell
+    let home = line.split(':').nth(5)?;
+    Some(std::path::PathBuf::from(home))
 }
