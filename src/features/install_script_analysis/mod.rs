@@ -221,6 +221,32 @@ mod tests {
         assert!(has(&ids, "P-INSTALL-XDG-AUTOSTART"));
     }
 
+    // --- Flag spacing bypass (issue #4) ---
+
+    #[test]
+    fn install_log_clear_split_flags() {
+        let ids = analyze("rm -r -f /var/log/auth.log");
+        assert!(has(&ids, "P-INSTALL-LOG-CLEAR"));
+    }
+
+    #[test]
+    fn install_base64_intervening_flags() {
+        let ids = analyze("echo payload | base64 -w 0 -d > /tmp/evil");
+        assert!(has(&ids, "P-INSTALL-BASE64"));
+    }
+
+    #[test]
+    fn install_chmod_exec_intervening_flags() {
+        let ids = analyze("chmod -v +x setup && ./setup");
+        assert!(has(&ids, "P-INSTALL-CHMOD-EXEC"));
+    }
+
+    #[test]
+    fn install_tmp_exec_intervening_flags() {
+        let ids = analyze("chmod -v +x /tmp/payload");
+        assert!(has(&ids, "P-INSTALL-TMP-EXEC"));
+    }
+
     #[test]
     fn benign_install_no_signals() {
         let ids = analyze(r#"

@@ -25,7 +25,7 @@ override_gate = true
 
 [[pkgbuild_analysis]]
 id = "P-REVSHELL-NC"
-pattern = '\b(nc|ncat)\s+(-e|-c)\s'
+pattern = '\b(nc|ncat)\s+[^;&|]*(-e|-c)\s'
 points = 95
 description = "Netcat reverse shell"
 override_gate = true
@@ -53,7 +53,7 @@ override_gate = false
 
 [[pkgbuild_analysis]]
 id = "P-BASE64"
-pattern = 'base64\s+(-d|--decode)'
+pattern = 'base64\s+(\S+\s+)*(-d|--decode)'
 points = 60
 description = "Base64 decoding (possible payload hiding)"
 override_gate = false
@@ -179,7 +179,7 @@ override_gate = false
 
 [[pkgbuild_analysis]]
 id = "P-SUID-BIT"
-pattern = 'chmod\s+[ugo]*\+s\s|chmod\s+[2-7][0-7]{3}\s'
+pattern = 'chmod\s+(-\S+\s+)*[ugo]*\+s\s|chmod\s+(-\S+\s+)*[2-7][0-7]{3}\s'
 points = 70
 description = "Setting SUID/SGID bit (privilege escalation)"
 override_gate = false
@@ -266,14 +266,14 @@ override_gate = false
 # Download-chmod-execute chains
 [[pkgbuild_analysis]]
 id = "P-CHMOD-EXEC-CHAIN"
-pattern = 'chmod\s+\+x\s+\S+\s*[;&|]+\s*\./'
+pattern = 'chmod\s+(-\S+\s+)*\+x\s+\S+\s*[;&|]+\s*\./'
 points = 75
 description = "chmod +x followed by execution (download-chmod-execute chain)"
 override_gate = false
 
 [[pkgbuild_analysis]]
 id = "P-WGET-CHMOD-EXEC"
-pattern = '(curl|wget)\s[^;&|]*\S+\s*[;&|]+\s*chmod\s+\+x'
+pattern = '(curl|wget)\s[^;&|]*\S+\s*[;&|]+\s*chmod\s+(-\S+\s+)*\+x'
 points = 85
 description = "Download followed by chmod +x (download-and-execute preparation)"
 override_gate = false
@@ -281,7 +281,7 @@ override_gate = false
 # /tmp staging
 [[pkgbuild_analysis]]
 id = "P-TMP-EXECUTION"
-pattern = '(chmod\s+\+x\s+/tmp/|>\s*/tmp/\S+\s*[;&|]+\s*(ba)?sh\s+/tmp/)'
+pattern = '(chmod\s+(-\S+\s+)*\+x\s+/tmp/|>\s*/tmp/\S+\s*[;&|]+\s*(ba)?sh\s+/tmp/)'
 points = 70
 description = "Writing or executing files in /tmp (common malware staging)"
 override_gate = false
@@ -319,7 +319,7 @@ override_gate = false
 
 [[pkgbuild_analysis]]
 id = "P-XXD-DECODE"
-pattern = 'xxd\s+(-r|-revert)'
+pattern = 'xxd\s+(\S+\s+)*(-r|-revert)'
 points = 55
 description = "xxd reverse (hex to binary decode, possible payload)"
 override_gate = false
@@ -365,7 +365,7 @@ override_gate = false
 # Archive extract-and-execute
 [[pkgbuild_analysis]]
 id = "P-ARCHIVE-EXEC"
-pattern = '(tar\s+[^;|&]*-?x[^;|&]*|unzip\s+[^;|&]*)[;&|]+\s*(\./|chmod\s+\+x)'
+pattern = '(tar\s+[^;|&]*-?x[^;|&]*|unzip\s+[^;|&]*)[;&|]+\s*(\./|chmod\s+(-\S+\s+)*\+x)'
 points = 55
 description = "Archive extraction followed by execution (extract-and-execute chain)"
 override_gate = false
@@ -489,7 +489,7 @@ override_gate = true
 # Encoding bypasses
 [[pkgbuild_analysis]]
 id = "P-BASE32"
-pattern = 'base32\s+(-d|--decode)'
+pattern = 'base32\s+(\S+\s+)*(-d|--decode)'
 points = 60
 description = "Base32 decoding (payload hiding)"
 override_gate = false
@@ -583,7 +583,7 @@ override_gate = false
 
 [[pkgbuild_analysis]]
 id = "P-LOG-CLEAR"
-pattern = '\brm\s+(-[rf]+\s+)?/var/log|truncate\s+.*\s+/var/log|>\s*/var/log/'
+pattern = '\brm\s+(-\S+\s+)*/var/log|truncate\s+.*\s+/var/log|>\s*/var/log/'
 points = 75
 description = "System log clearing/truncation"
 override_gate = false
@@ -676,7 +676,7 @@ override_gate = false
 
 [[install_script_analysis]]
 id = "P-INSTALL-BASE64"
-pattern = 'base64\s+(-d|--decode)'
+pattern = 'base64\s+(\S+\s+)*(-d|--decode)'
 points = 65
 description = "Base64 decoding in install script (possible payload hiding)"
 override_gate = false
@@ -697,14 +697,14 @@ override_gate = false
 
 [[install_script_analysis]]
 id = "P-INSTALL-TMP-EXEC"
-pattern = '(chmod\s+\+x\s+/tmp/|>\s*/tmp/\S+\s*[;&|]+\s*(ba)?sh\s+/tmp/)'
+pattern = '(chmod\s+(-\S+\s+)*\+x\s+/tmp/|>\s*/tmp/\S+\s*[;&|]+\s*(ba)?sh\s+/tmp/)'
 points = 80
 description = "Executing from /tmp in install script"
 override_gate = false
 
 [[install_script_analysis]]
 id = "P-INSTALL-CHMOD-EXEC"
-pattern = 'chmod\s+\+x\s+\S+\s*[;&|]+\s*\./'
+pattern = 'chmod\s+(-\S+\s+)*\+x\s+\S+\s*[;&|]+\s*\./'
 points = 80
 description = "chmod +x followed by execution in install script"
 override_gate = false
@@ -774,7 +774,7 @@ override_gate = false
 
 [[install_script_analysis]]
 id = "P-INSTALL-LOG-CLEAR"
-pattern = '\brm\s+(-[rf]+\s+)?/var/log|truncate\s+.*\s+/var/log|>\s*/var/log/'
+pattern = '\brm\s+(-\S+\s+)*/var/log|truncate\s+.*\s+/var/log|>\s*/var/log/'
 points = 80
 description = "Log clearing in install script"
 override_gate = false

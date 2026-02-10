@@ -23,10 +23,11 @@ Collected from [Reddit r/archlinux](https://www.reddit.com/r/archlinux/comments/
 - ~~Source: EndeavourOS~~
 - **Fixed**: Hook now collects results silently, shows tier summary, only prints detail for SKETCHY+ packages, and skips the prompt entirely when all packages are TRUSTED/OK. Only MALICIOUS hard-blocks.
 
-### 4. Flag spacing bypass (`rm -r -f` vs `rm -rf`)
-- `rm -r -f /var/log` is not detected, only `rm -rf /var/log`
-- Patterns need to handle flag variations with spaces
-- Source: Reddit (ang-p)
+### ~~4. Flag spacing bypass (`rm -r -f` vs `rm -rf`)~~
+- ~~`rm -r -f /var/log` is not detected, only `rm -rf /var/log`~~
+- ~~Patterns need to handle flag variations with spaces~~
+- ~~Source: Reddit (ang-p)~~
+- **Fixed**: Added flag-absorber regex fragments (`(-\S+\s+)*`, `(\S+\s+)*`, `[^;&|]*`) to 13 patterns across pkgbuild_analysis and install_script_analysis to handle split flags (`rm -r -f`), intervening flags (`chmod -v +x`), and flag+value pairs (`base64 -w 0 -d`)
 
 ## Medium Priority
 
