@@ -5,7 +5,7 @@ use regex::Regex;
 use std::sync::LazyLock;
 
 static HAS_CHECKSUMS_RE: LazyLock<Regex> = LazyLock::new(|| {
-    Regex::new(r"(?m)^(md5|sha1|sha224|sha256|sha384|sha512|b2)sums=").unwrap()
+    Regex::new(r"(?m)^(md5|sha1|sha224|sha256|sha384|sha512|b2)sums(_[a-zA-Z0-9_]+)?\s*=").unwrap()
 });
 
 static WEAK_CHECKSUMS_RE: LazyLock<Regex> = LazyLock::new(|| {
@@ -80,7 +80,7 @@ impl Feature for ChecksumAnalysis {
         }
 
         // Check source count vs checksum count mismatch (including arch-specific arrays)
-        for suffix in find_array_suffixes(content) {
+        'outer: for suffix in find_array_suffixes(content) {
             let source_name = format!("source{suffix}");
             let src_count = count_array_entries(content, &source_name);
             if src_count > 0 {
@@ -98,7 +98,7 @@ impl Feature for ChecksumAnalysis {
                             is_override_gate: false,
                             matched_line: None,
                         });
-                        break;
+                        break 'outer;
                     }
                 }
             }
@@ -240,5 +240,29 @@ mod tests {
     fn checksum_arch_specific_real_mismatch() {
         let ids = analyze("test-pkg", "source=('a.tar.gz' 'b.patch')\nsha256sums=('hash1')\n");
         assert!(has(&ids, "P-CHECKSUM-MISMATCH"));
+    }
+
+    #[test]
+    fn arch_only_checksums_no_false_no_checksums() {
+        // Package with only arch-specific checksum arrays should NOT fire P-NO-CHECKSUMS
+        let ids = analyze("test-bin", "source_x86_64=('a.tar.gz')\nsha256sums_x86_64=('hash1')\n");
+        assert!(!has(&ids, "P-NO-CHECKSUMS"), "arch-specific checksums should count, got: {ids:?}");
+    }
+
+    #[test]
+    fn mismatch_emits_only_one_signal() {
+        // Multiple arch suffixes with mismatches should only emit one P-CHECKSUM-MISMATCH
+        let ctx = PackageContext {
+            name: "test-bin".into(),
+            metadata: None,
+            pkgbuild_content: Some("source_x86_64=('a' 'b' 'c')\nsha256sums_x86_64=('h1')\nsource_aarch64=('d' 'e' 'f')\nsha256sums_aarch64=('h2')\n".into()),
+            install_script_content: None,
+            prior_pkgbuild_content: None,
+            git_log: vec![],
+            maintainer_packages: vec![],
+        };
+        let signals = ChecksumAnalysis.analyze(&ctx);
+        let mismatch_count = signals.iter().filter(|s| s.id == "P-CHECKSUM-MISMATCH").count();
+        assert_eq!(mismatch_count, 1, "should emit exactly one mismatch signal, got {mismatch_count}");
     }
 }
