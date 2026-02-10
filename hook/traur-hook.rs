@@ -90,7 +90,7 @@ fn main() {
 
         match coordinator::build_context(pkg) {
             Ok(ctx) => {
-                let result = coordinator::run_analysis(&ctx);
+                let result = coordinator::run_analysis_with_config(&ctx, &config);
                 let idx = match result.tier {
                     Tier::Trusted => 0,
                     Tier::Ok => 1,

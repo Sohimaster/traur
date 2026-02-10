@@ -76,6 +76,8 @@ Use `/release <version>` in Claude Code to run the full release workflow (bump v
 | `src/features/shell_analysis/` | Beyond-regex static analysis (var concat, indirect exec, char-by-char, data blobs, binary download) |
 | `src/features/gtfobins_analysis/` | GTFOBins-derived patterns (117 patterns for legitimate binary abuse) |
 | `src/features/bin_source_verification/` | -bin package source domain vs upstream URL mismatch detection |
+| `src/shared/signal_registry.rs` | Central registry of all signal definitions (pattern + hardcoded) |
+| `src/shared/config.rs` | User config: whitelist, ignored signals/categories |
 | `data/patterns.toml` | Regex pattern database (239 patterns) |
 | `src/bench.rs` | Batch benchmark (parallel scan, retry, stats) |
 | `hook/traur.hook` | ALPM hook definition |

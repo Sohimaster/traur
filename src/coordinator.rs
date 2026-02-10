@@ -133,12 +133,26 @@ pub fn scan_pkgbuild(name: &str, pkgbuild_content: &str) -> ScanResult {
 
 /// Run all registered features against the context and compute a score.
 pub fn run_analysis(ctx: &PackageContext) -> ScanResult {
+    let config = crate::shared::config::load_config();
+    run_analysis_with_config(ctx, &config)
+}
+
+/// Run analysis with a pre-loaded config (avoids reloading per package in bulk scans).
+pub fn run_analysis_with_config(
+    ctx: &PackageContext,
+    config: &crate::shared::config::Config,
+) -> ScanResult {
     let all_features = features::all_features();
 
     let mut all_signals = Vec::new();
     for feature in &all_features {
         let signals = feature.analyze(ctx);
         all_signals.extend(signals);
+    }
+
+    if !config.ignored.signals.is_empty() || !config.ignored.categories.is_empty() {
+        all_signals
+            .retain(|s| !crate::shared::config::is_signal_ignored(config, &s.id, &s.category));
     }
 
     scoring::compute_score(&ctx.name, &all_signals)

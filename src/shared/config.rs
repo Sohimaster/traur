@@ -6,6 +6,8 @@ pub struct Config {
     pub thresholds: ThresholdConfig,
     #[serde(default)]
     pub whitelist: WhitelistConfig,
+    #[serde(default)]
+    pub ignored: IgnoredConfig,
 }
 
 #[derive(Debug, Deserialize, Serialize)]
@@ -37,6 +39,14 @@ fn default_warn_at() -> String {
 pub struct WhitelistConfig {
     #[serde(default)]
     pub packages: Vec<String>,
+}
+
+#[derive(Debug, Deserialize, Serialize, Default)]
+pub struct IgnoredConfig {
+    #[serde(default)]
+    pub signals: Vec<String>,
+    #[serde(default)]
+    pub categories: Vec<String>,
 }
 
 /// Load config from ~/.config/traur/config.toml, falling back to defaults.
@@ -75,6 +85,70 @@ pub fn add_to_whitelist(package: &str) -> Result<(), String> {
 #[allow(dead_code)] // Used by traur-hook binary
 pub fn is_whitelisted_in(config: &Config, package: &str) -> bool {
     config.whitelist.packages.iter().any(|p| p == package)
+}
+
+/// Add a signal ID to the ignored list and persist to disk.
+pub fn add_to_ignored(signal_id: &str) -> Result<(), String> {
+    let mut config = load_config();
+    if !config.ignored.signals.contains(&signal_id.to_string()) {
+        config.ignored.signals.push(signal_id.to_string());
+        config.ignored.signals.sort();
+    }
+    save_config(&config)
+}
+
+/// Remove a signal ID from the ignored list and persist to disk.
+pub fn remove_from_ignored(signal_id: &str) -> Result<(), String> {
+    let mut config = load_config();
+    config.ignored.signals.retain(|s| s != signal_id);
+    save_config(&config)
+}
+
+/// Check if a signal should be ignored (by individual ID or by category).
+/// Ignoring "SA-FOO" also suppresses "IS-SA-FOO".
+#[allow(dead_code)] // Used by coordinator and traur-hook
+pub fn is_signal_ignored(
+    config: &Config,
+    signal_id: &str,
+    signal_category: &crate::shared::scoring::SignalCategory,
+) -> bool {
+    // Check category-level ignore
+    if !config.ignored.categories.is_empty() {
+        let cat_str = format!("{:?}", signal_category);
+        if config.ignored.categories.iter().any(|c| c.eq_ignore_ascii_case(&cat_str)) {
+            return true;
+        }
+    }
+
+    if config.ignored.signals.is_empty() {
+        return false;
+    }
+    // Exact match
+    if config.ignored.signals.iter().any(|s| s == signal_id) {
+        return true;
+    }
+    // IS-prefixed variant: if "SA-FOO" is ignored, "IS-SA-FOO" is also ignored
+    if let Some(base) = signal_id.strip_prefix("IS-") {
+        return config.ignored.signals.iter().any(|s| s == base);
+    }
+    false
+}
+
+/// Add a category to the ignored list and persist to disk.
+pub fn add_category_to_ignored(category: &str) -> Result<(), String> {
+    let mut config = load_config();
+    if !config.ignored.categories.iter().any(|c| c.eq_ignore_ascii_case(category)) {
+        config.ignored.categories.push(category.to_string());
+        config.ignored.categories.sort();
+    }
+    save_config(&config)
+}
+
+/// Remove a category from the ignored list and persist to disk.
+pub fn remove_category_from_ignored(category: &str) -> Result<(), String> {
+    let mut config = load_config();
+    config.ignored.categories.retain(|c| !c.eq_ignore_ascii_case(category));
+    save_config(&config)
 }
 
 pub fn config_path() -> std::path::PathBuf {

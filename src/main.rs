@@ -59,6 +59,30 @@ enum Commands {
         #[arg(long, default_value_t = 8)]
         jobs: usize,
     },
+    /// List all available signals
+    Signals {
+        /// Output as JSON
+        #[arg(long)]
+        json: bool,
+    },
+    /// Ignore a signal or category (exclude from scoring and output)
+    Ignore {
+        /// Signal ID to ignore (e.g. P-PYTHON-INLINE)
+        signal_id: Option<String>,
+
+        /// Ignore all signals in a category (Metadata, Pkgbuild, Behavioral, Temporal)
+        #[arg(long)]
+        category: Option<String>,
+    },
+    /// Unignore a previously ignored signal or category
+    Unignore {
+        /// Signal ID to restore
+        signal_id: Option<String>,
+
+        /// Restore all signals in a category
+        #[arg(long)]
+        category: Option<String>,
+    },
 }
 
 fn main() {
@@ -76,6 +100,9 @@ fn main() {
         } => cmd_scan(package, pkgbuild, all_installed, jobs, json, verbose, all),
         Commands::Allow { package } => cmd_allow(&package),
         Commands::Bench { count, jobs } => bench::run(count, jobs),
+        Commands::Signals { json } => cmd_signals(json),
+        Commands::Ignore { signal_id, category } => cmd_ignore(signal_id.as_deref(), category.as_deref()),
+        Commands::Unignore { signal_id, category } => cmd_unignore(signal_id.as_deref(), category.as_deref()),
     };
 
     process::exit(exit_code);
@@ -175,6 +202,8 @@ fn cmd_scan_all_installed(jobs: usize, json: bool, verbose: bool, all: bool) -> 
 
     let maintainer_packages = prefetch_maintainer_packages(&metadata);
 
+    let config = shared::config::load_config();
+
     let pool = rayon::ThreadPoolBuilder::new()
         .num_threads(jobs)
         .build()
@@ -203,7 +232,7 @@ fn cmd_scan_all_installed(jobs: usize, json: bool, verbose: bool, all: bool) -> 
                     .unwrap_or_default();
 
                 match clone_with_retry(name, meta, maint_pkgs) {
-                    Ok(ctx) => Ok(coordinator::run_analysis(&ctx)),
+                    Ok(ctx) => Ok(coordinator::run_analysis_with_config(&ctx, &config)),
                     Err(e) => Err(e),
                 }
             } else {
@@ -324,6 +353,154 @@ fn cmd_allow(package: &str) -> i32 {
         }
         Err(e) => {
             eprintln!("Error: {e}");
+            1
+        }
+    }
+}
+
+fn cmd_signals(json: bool) -> i32 {
+    use shared::scoring::SignalCategory;
+    use shared::signal_registry::all_signal_definitions;
+
+    let defs = all_signal_definitions();
+    let config = shared::config::load_config();
+    let ignored_signals = &config.ignored.signals;
+    let ignored_categories = &config.ignored.categories;
+
+    let is_ignored = |d: &shared::signal_registry::SignalDef| -> bool {
+        if ignored_signals.contains(&d.id) {
+            return true;
+        }
+        let cat_str = format!("{:?}", d.category);
+        ignored_categories.iter().any(|c| c.eq_ignore_ascii_case(&cat_str))
+    };
+
+    if json {
+        let entries: Vec<serde_json::Value> = defs
+            .iter()
+            .map(|d| {
+                serde_json::json!({
+                    "id": d.id,
+                    "category": format!("{:?}", d.category),
+                    "description": d.description,
+                    "ignored": is_ignored(d),
+                })
+            })
+            .collect();
+        println!(
+            "{}",
+            serde_json::to_string_pretty(&entries).expect("Failed to serialize")
+        );
+        return 0;
+    }
+
+    let categories = [
+        (SignalCategory::Metadata, "Metadata (weight 0.15)"),
+        (SignalCategory::Pkgbuild, "Pkgbuild (weight 0.45)"),
+        (SignalCategory::Behavioral, "Behavioral (weight 0.25)"),
+        (SignalCategory::Temporal, "Temporal (weight 0.15)"),
+    ];
+
+    let mut total = 0;
+    let mut ignored_count = 0;
+
+    for (cat, label) in &categories {
+        let cat_defs: Vec<_> = defs.iter().filter(|d| d.category == *cat).collect();
+        if cat_defs.is_empty() {
+            continue;
+        }
+        println!("\n  {label}");
+        for d in &cat_defs {
+            let sig_ignored = is_ignored(d);
+            let marker = if sig_ignored { " [IGNORED]" } else { "" };
+            println!(
+                "  {:<36} {}{}",
+                d.id, d.description, marker
+            );
+            total += 1;
+            if sig_ignored {
+                ignored_count += 1;
+            }
+        }
+    }
+
+    println!();
+    if ignored_count > 0 {
+        println!("  {total} signals ({ignored_count} ignored)");
+    } else {
+        println!("  {total} signals");
+    }
+    0
+}
+
+fn cmd_ignore(signal_id: Option<&str>, category: Option<&str>) -> i32 {
+    match (signal_id, category) {
+        (Some(id), None) => {
+            if !shared::signal_registry::is_known_signal(id) {
+                eprintln!("Unknown signal: {id}");
+                eprintln!("Use 'traur signals' to list available signal IDs.");
+                return 1;
+            }
+            match shared::config::add_to_ignored(id) {
+                Ok(()) => {
+                    eprintln!("Ignored: {id}");
+                    eprintln!("  Saved to {}", shared::config::config_path().display());
+                    0
+                }
+                Err(e) => { eprintln!("Error: {e}"); 1 }
+            }
+        }
+        (None, Some(cat)) => {
+            if shared::signal_registry::category_from_str(cat).is_none() {
+                eprintln!("Unknown category: {cat}");
+                eprintln!("Valid categories: Metadata, Pkgbuild, Behavioral, Temporal");
+                return 1;
+            }
+            match shared::config::add_category_to_ignored(cat) {
+                Ok(()) => {
+                    eprintln!("Ignored category: {cat}");
+                    eprintln!("  Saved to {}", shared::config::config_path().display());
+                    0
+                }
+                Err(e) => { eprintln!("Error: {e}"); 1 }
+            }
+        }
+        _ => {
+            eprintln!("Provide either a signal ID or --category, not both.");
+            1
+        }
+    }
+}
+
+fn cmd_unignore(signal_id: Option<&str>, category: Option<&str>) -> i32 {
+    match (signal_id, category) {
+        (Some(id), None) => {
+            match shared::config::remove_from_ignored(id) {
+                Ok(()) => {
+                    eprintln!("Unignored: {id}");
+                    eprintln!("  Saved to {}", shared::config::config_path().display());
+                    0
+                }
+                Err(e) => { eprintln!("Error: {e}"); 1 }
+            }
+        }
+        (None, Some(cat)) => {
+            if shared::signal_registry::category_from_str(cat).is_none() {
+                eprintln!("Unknown category: {cat}");
+                eprintln!("Valid categories: Metadata, Pkgbuild, Behavioral, Temporal");
+                return 1;
+            }
+            match shared::config::remove_category_from_ignored(cat) {
+                Ok(()) => {
+                    eprintln!("Unignored category: {cat}");
+                    eprintln!("  Saved to {}", shared::config::config_path().display());
+                    0
+                }
+                Err(e) => { eprintln!("Error: {e}"); 1 }
+            }
+        }
+        _ => {
+            eprintln!("Provide either a signal ID or --category, not both.");
             1
         }
     }

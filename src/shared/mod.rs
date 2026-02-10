@@ -7,3 +7,4 @@ pub mod models;
 pub mod output;
 pub mod patterns;
 pub mod scoring;
+pub mod signal_registry;
