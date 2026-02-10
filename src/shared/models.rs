@@ -25,6 +25,7 @@ pub struct AurPackage {
     pub maintainer: Option<String>,
     pub submitter: Option<String>,
     pub first_submitted: u64,
+    #[allow(dead_code)]
     pub last_modified: u64,
     pub license: Option<Vec<String>>,
 }

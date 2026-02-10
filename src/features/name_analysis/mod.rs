@@ -106,6 +106,12 @@ pub struct NameAnalysis;
 
 impl Feature for NameAnalysis {
     fn analyze(&self, ctx: &PackageContext) -> Vec<Signal> {
+        if let Some(ref meta) = ctx.metadata {
+            if meta.num_votes >= 10 {
+                return Vec::new();
+            }
+        }
+
         let mut signals = Vec::new();
         let name = &ctx.name;
 
@@ -197,6 +203,32 @@ mod tests {
         NameAnalysis.analyze(&ctx).iter().map(|s| s.id.clone()).collect()
     }
 
+    fn analyze_with_votes(name: &str, votes: u32) -> Vec<String> {
+        use crate::shared::models::AurPackage;
+        let ctx = PackageContext {
+            name: name.into(),
+            metadata: Some(AurPackage {
+                name: name.into(),
+                package_base: None,
+                url: None,
+                num_votes: votes,
+                popularity: 0.0,
+                out_of_date: None,
+                maintainer: None,
+                submitter: None,
+                first_submitted: 0,
+                last_modified: 0,
+                license: None,
+            }),
+            pkgbuild_content: None,
+            install_script_content: None,
+            prior_pkgbuild_content: None,
+            git_log: vec![],
+            maintainer_packages: vec![],
+        };
+        NameAnalysis.analyze(&ctx).iter().map(|s| s.id.clone()).collect()
+    }
+
     fn has(ids: &[String], id: &str) -> bool {
         ids.iter().any(|s| s == id)
     }
@@ -232,5 +264,30 @@ mod tests {
     fn normal_name_no_signals() {
         let ids = analyze("my-custom-tool");
         assert!(ids.is_empty(), "Normal name should trigger no signals, got: {ids:?}");
+    }
+
+    #[test]
+    fn established_packages_skip_all_name_signals() {
+        // Packages with enough votes skip all name-based checks
+        assert!(analyze_with_votes("pary", 50).is_empty());
+        assert!(analyze_with_votes("firefox-fix", 50).is_empty());
+        assert!(analyze_with_votes("yay2", 50).is_empty());
+        assert!(analyze_with_votes("python-steam", 37).is_empty());
+        assert!(analyze_with_votes("proton-ge-custom-bin", 267).is_empty());
+    }
+
+    #[test]
+    fn new_packages_still_checked() {
+        assert!(has(&analyze_with_votes("pary", 0), "B-TYPOSQUAT"));
+        assert!(has(&analyze_with_votes("firefox-fix", 0), "B-NAME-IMPERSONATE"));
+        assert!(has(&analyze_with_votes("yay2", 0), "B-TYPOSQUAT"));
+    }
+
+    #[test]
+    fn no_metadata_runs_all_checks() {
+        // analyze() uses metadata: None — all string checks run
+        assert!(has(&analyze("pary"), "B-TYPOSQUAT"));
+        assert!(has(&analyze("firefox-fix"), "B-NAME-IMPERSONATE"));
+        assert!(has(&analyze("yay2"), "B-TYPOSQUAT"));
     }
 }
