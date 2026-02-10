@@ -1,6 +1,6 @@
 [package]
 name = "traur"
-version = "0.2.6"
+version = "0.2.5"
 edition = "2024"
 description = "Trust scoring for AUR packages"
 license = "MIT"

@@ -167,22 +167,20 @@ fn main() {
     }
 
     let has_malicious = tier_counts[4] > 0;
-    let has_suspicious = tier_counts[3] > 0;
-    let has_sketchy = tier_counts[2] > 0;
+    let has_flagged = tier_counts[2] > 0 || tier_counts[3] > 0; // SKETCHY or SUSPICIOUS
 
-    // Case 2: MALICIOUS or SUSPICIOUS detected -> hard block, must whitelist
-    if has_malicious || has_suspicious {
+    // Case 2: MALICIOUS detected -> hard block, must whitelist
+    if has_malicious {
         flagged.sort_by(|a, b| a.score.cmp(&b.score));
         let _ = writeln!(tty);
         for result in &flagged {
             output::write_text(&mut tty, result, false);
             let _ = writeln!(tty);
         }
-        let label = if has_malicious { "MALICIOUS" } else { "SUSPICIOUS" };
         let _ = writeln!(
             tty,
             "{}",
-            format!("traur: {label} package(s) detected — blocking transaction").red().bold()
+            "traur: MALICIOUS package(s) detected — blocking transaction".red().bold()
         );
         let _ = writeln!(
             tty,
@@ -206,8 +204,8 @@ fn main() {
         std::process::exit(1);
     }
 
-    // Case 4: SKETCHY -> show detail, prompt [y/N]
-    if has_sketchy {
+    // Case 4: SKETCHY or SUSPICIOUS -> show detail, prompt [y/N]
+    if has_flagged {
         flagged.sort_by(|a, b| a.score.cmp(&b.score));
         let _ = writeln!(tty);
         for result in &flagged {
