@@ -19,12 +19,11 @@ paru -S traur
 traur scan                # scan all installed aur packages
 traur scan <package>      # scan a package
 traur allow <package>     # whitelist a package
-traur bench               # benchmark 1000 latest AUR packages
 ```
 
 ## How it works
 
-10 independent features emit scored signals per package:
+12 independent features emit scored signals per package:
 
 | Feature | What it checks |
 |---------|---------------|
@@ -35,9 +34,11 @@ traur bench               # benchmark 1000 latest AUR packages
 | Metadata analysis | AUR votes, popularity, maintainer status |
 | Name analysis | Typosquatting and brand impersonation |
 | Maintainer analysis | New accounts, batch uploads |
+| Orphan takeover analysis | Submitter != maintainer, orphan takeover patterns |
 | Git history analysis | New network code, author changes |
 | Shell analysis | Beyond-regex obfuscation (var concat, indirect exec, data blobs) |
 | GTFOBins analysis | Legitimate binary abuse |
+| Bin source verification | -bin package source domain vs upstream URL mismatch |
 
 ## Detection coverage
 
@@ -47,16 +48,6 @@ Patterns derived from real AUR malware incidents:
 - **Acroread (2018)** — orphan takeover, curl from paste service, systemd persistence
 
 Categories: download-and-execute, reverse shells, credential theft, persistence mechanisms, privilege escalation, C2/exfiltration, cryptocurrency mining, code obfuscation, kernel module loading, environment variable theft, system reconnaissance.
-
-## Benchmark
-
-```bash
-traur bench [--count N] [--jobs J]
-```
-
-Scans the N most recently modified AUR packages in parallel. Prints detailed signals for SKETCHY+ packages.
-
-Analysis: **~0.5ms per package** (10 features, 239 regex patterns). Bottleneck is AUR git I/O.
 
 ## License
 
