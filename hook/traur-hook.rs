@@ -1,7 +1,7 @@
 //! traur-hook: ALPM pre-transaction hook binary.
 //! Reads package names from stdin (passed by pacman/paru via NeedsTargets),
-//! filters to AUR-only packages, scans each using the traur library directly,
-//! shows all results, and prompts the user before continuing.
+//! filters to AUR-only packages, scans each silently, then shows a summary.
+//! Detail is only printed for SKETCHY+ packages. No prompt when all clean.
 //!
 //! All output goes to /dev/tty — pacman buffers both stdout and stderr from
 //! hooks, so we must write directly to the terminal.
@@ -14,7 +14,7 @@ use colored::Colorize;
 use traur::coordinator;
 use traur::shared::config::{self, is_whitelisted_in};
 use traur::shared::output;
-use traur::shared::scoring::Tier;
+use traur::shared::scoring::{ScanResult, Tier};
 
 fn main() {
     // Force colored output — ALPM hooks inherit the terminal but colored
@@ -54,10 +54,6 @@ fn main() {
     };
 
     let config = config::load_config();
-    let mut has_critical = false;
-    let mut has_high = false;
-    let mut has_scan_error = false;
-    let mut any_scanned = false;
 
     let _ = writeln!(
         tty,
@@ -72,41 +68,119 @@ fn main() {
     let _ = writeln!(tty, "  {}", "Trust scoring for AUR packages".dimmed());
     let _ = writeln!(tty);
 
-    for pkg in &aur_packages {
+    // --- Phase 1: Collect results silently ---
+    let total_aur = aur_packages.len();
+    let mut flagged: Vec<ScanResult> = Vec::new();
+    let mut scan_errors: Vec<(String, String)> = Vec::new();
+    let mut whitelisted_count: u32 = 0;
+    let mut tier_counts: [u32; 5] = [0, 0, 0, 0, 0]; // Trusted, Ok, Sketchy, Suspicious, Malicious
+    let mut any_scanned = false;
+
+    for (i, pkg) in aur_packages.iter().enumerate() {
         if is_whitelisted_in(&config, pkg) {
-            let _ = writeln!(tty, "traur: {pkg} (whitelisted, skipping scan)");
+            whitelisted_count += 1;
             continue;
         }
 
         any_scanned = true;
 
+        // Progress indicator (single line, overwritten each iteration)
+        let _ = write!(tty, "\r  Scanning {} ({}/{})...          ", pkg, i + 1, total_aur);
+        let _ = tty.flush();
+
         match coordinator::build_context(pkg) {
             Ok(ctx) => {
                 let result = coordinator::run_analysis(&ctx);
-                output::write_text(&mut tty, &result, false);
-                if result.tier >= Tier::Suspicious {
-                    has_critical = true;
-                } else if result.tier >= Tier::Sketchy {
-                    has_high = true;
+                let idx = match result.tier {
+                    Tier::Trusted => 0,
+                    Tier::Ok => 1,
+                    Tier::Sketchy => 2,
+                    Tier::Suspicious => 3,
+                    Tier::Malicious => 4,
+                };
+                tier_counts[idx] += 1;
+
+                if result.tier >= Tier::Sketchy {
+                    flagged.push(result);
                 }
             }
             Err(e) => {
-                let _ = writeln!(tty, "{}", format!("traur: failed to scan '{pkg}': {e}").red());
-                has_scan_error = true;
+                scan_errors.push((pkg.clone(), e));
             }
         }
     }
 
+    // Clear the progress line
+    let _ = write!(tty, "\r{}\r", " ".repeat(72));
+    let _ = tty.flush();
+
+    // --- Phase 2: Output + decision ---
+
+    // Case 1: All whitelisted
     if !any_scanned {
-        return; // All packages were whitelisted
+        if whitelisted_count > 0 {
+            let _ = writeln!(
+                tty,
+                "  {} package(s) whitelisted, nothing to scan.",
+                whitelisted_count
+            );
+        }
+        return;
     }
 
-    if has_critical {
+    // Print tier summary
+    let scanned: u32 = tier_counts.iter().sum();
+    let _ = writeln!(tty, "  Scanned: {} package(s)", scanned);
+
+    let tier_labels = [
+        ("TRUSTED", tier_counts[0]),
+        ("OK", tier_counts[1]),
+        ("SKETCHY", tier_counts[2]),
+        ("SUSPICIOUS", tier_counts[3]),
+        ("MALICIOUS", tier_counts[4]),
+    ];
+    let tier_parts: Vec<String> = tier_labels
+        .iter()
+        .filter(|(_, count)| *count > 0)
+        .map(|(label, count)| {
+            let colored_label = match *label {
+                "TRUSTED" => label.green().to_string(),
+                "OK" => label.yellow().to_string(),
+                "SKETCHY" => label.truecolor(255, 165, 0).to_string(),
+                "SUSPICIOUS" => label.red().to_string(),
+                "MALICIOUS" => label.red().bold().to_string(),
+                _ => label.to_string(),
+            };
+            format!("{}: {}", colored_label, count)
+        })
+        .collect();
+    if !tier_parts.is_empty() {
+        let _ = writeln!(tty, "  {}", tier_parts.join("  "));
+    }
+
+    // Print scan errors
+    if !scan_errors.is_empty() {
         let _ = writeln!(tty);
+        for (pkg, err) in &scan_errors {
+            let _ = writeln!(tty, "{}", format!("  error: {pkg}: {err}").red());
+        }
+    }
+
+    let has_malicious = tier_counts[4] > 0;
+    let has_flagged = tier_counts[2] > 0 || tier_counts[3] > 0; // SKETCHY or SUSPICIOUS
+
+    // Case 2: MALICIOUS detected -> hard block, must whitelist
+    if has_malicious {
+        flagged.sort_by(|a, b| a.score.cmp(&b.score));
+        let _ = writeln!(tty);
+        for result in &flagged {
+            output::write_text(&mut tty, result, false);
+            let _ = writeln!(tty);
+        }
         let _ = writeln!(
             tty,
             "{}",
-            "traur: SUSPICIOUS/MALICIOUS packages detected above".red().bold()
+            "traur: MALICIOUS package(s) detected — blocking transaction".red().bold()
         );
         let _ = writeln!(
             tty,
@@ -115,7 +189,8 @@ fn main() {
         std::process::exit(1);
     }
 
-    if has_scan_error {
+    // Case 3: Scan errors -> hard block (fail closed)
+    if !scan_errors.is_empty() {
         let _ = writeln!(tty);
         let _ = writeln!(
             tty,
@@ -129,37 +204,37 @@ fn main() {
         std::process::exit(1);
     }
 
-    // Prompt: default Y for trusted, default N for SKETCHY
-    let default_yes = !has_high;
-    let prompt_text = if default_yes {
-        "traur: Continue with installation? [Y/n]"
-    } else {
-        "traur: Continue with installation? [y/N]"
-    };
+    // Case 4: SKETCHY or SUSPICIOUS -> show detail, prompt [y/N]
+    if has_flagged {
+        flagged.sort_by(|a, b| a.score.cmp(&b.score));
+        let _ = writeln!(tty);
+        for result in &flagged {
+            output::write_text(&mut tty, result, false);
+            let _ = writeln!(tty);
+        }
 
-    let _ = writeln!(tty);
-    let _ = write!(tty, "{} ", prompt_text.bold());
-    let _ = tty.flush();
+        let _ = write!(tty, "{} ", "traur: Continue with installation? [y/N]".bold());
+        let _ = tty.flush();
 
-    let mut reader = BufReader::new(tty);
-    let mut line = String::new();
-    let response = match reader.read_line(&mut line) {
-        Ok(0) => "",
-        Ok(_) => line.trim(),
-        Err(_) => "",
-    };
+        let mut reader = BufReader::new(tty);
+        let mut line = String::new();
+        let response = match reader.read_line(&mut line) {
+            Ok(0) => "",
+            Ok(_) => line.trim(),
+            Err(_) => "",
+        };
 
-    let proceed = match response.to_lowercase().as_str() {
-        "y" | "yes" => true,
-        "n" | "no" => false,
-        "" => default_yes, // Enter = use default
-        _ => default_yes,
-    };
+        let proceed = matches!(response.to_lowercase().as_str(), "y" | "yes");
 
-    if !proceed {
-        eprintln!("traur: aborting transaction");
-        std::process::exit(1);
+        if !proceed {
+            eprintln!("traur: aborting transaction");
+            std::process::exit(1);
+        }
+        return;
     }
+
+    // Case 5: All clean -> no prompt
+    let _ = writeln!(tty, "  {}", "All packages look clean.".green());
 }
 
 /// Get all package names from official sync databases in one call.
