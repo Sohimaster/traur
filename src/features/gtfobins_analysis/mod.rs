@@ -128,6 +128,12 @@ mod tests {
         assert!(has(&ids, "G-BINDSHELL-NC"), "got: {ids:?}");
     }
 
+    #[test]
+    fn bindshell_nc_megasync_no_signal() {
+        let ids = analyze("git -C MEGAsync -c protocol.file.allow='always' submodule update");
+        assert!(!has(&ids, "G-BINDSHELL-NC"), "MEGAsync should not trigger G-BINDSHELL-NC, got: {ids:?}");
+    }
+
     // === Pipe-to-Interpreter ===
 
     #[test]

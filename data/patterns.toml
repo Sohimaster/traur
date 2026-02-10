@@ -25,7 +25,7 @@ override_gate = true
 
 [[pkgbuild_analysis]]
 id = "P-REVSHELL-NC"
-pattern = '(nc|ncat)\s+(-e|-c)\s'
+pattern = '\b(nc|ncat)\s+(-e|-c)\s'
 points = 95
 description = "Netcat reverse shell"
 override_gate = true
@@ -207,7 +207,7 @@ override_gate = false
 
 [[pkgbuild_analysis]]
 id = "P-DISK-READ"
-pattern = 'dd\s+if=/dev/sd'
+pattern = '\bdd\s+if=/dev/sd'
 points = 60
 description = "Direct disk device read (data exfiltration)"
 override_gate = false
@@ -304,7 +304,7 @@ override_gate = false
 # System reconnaissance
 [[pkgbuild_analysis]]
 id = "P-SYSINFO-RECON"
-pattern = '(uname\s+-a|cat\s+/proc/cpuinfo|lspci|ip\s+addr|hostname\s+-[fI]|cat\s+/etc/machine-id|dmidecode)'
+pattern = '(\buname\s+-a|\bcat\s+/proc/cpuinfo|\blspci|\bip\s+addr|\bhostname\s+-[fI]|\bcat\s+/etc/machine-id|\bdmidecode)'
 points = 40
 description = "System information gathering (reconnaissance)"
 override_gate = false
@@ -395,7 +395,7 @@ override_gate = false
 
 [[pkgbuild_analysis]]
 id = "P-ROT13"
-pattern = 'tr\s.*n-za-m'
+pattern = '\btr\s.*n-za-m'
 points = 60
 description = "ROT13 encoding/decoding (payload obfuscation)"
 override_gate = false
@@ -583,7 +583,7 @@ override_gate = false
 
 [[pkgbuild_analysis]]
 id = "P-LOG-CLEAR"
-pattern = 'rm\s+(-[rf]+\s+)?/var/log|truncate\s+.*\s+/var/log|>\s*/var/log/'
+pattern = '\brm\s+(-[rf]+\s+)?/var/log|truncate\s+.*\s+/var/log|>\s*/var/log/'
 points = 75
 description = "System log clearing/truncation"
 override_gate = false
@@ -598,7 +598,7 @@ override_gate = false
 
 [[pkgbuild_analysis]]
 id = "P-DD-WRITE"
-pattern = 'dd\s+.*of=/dev/'
+pattern = '\bdd\s+.*of=/dev/'
 points = 70
 description = "dd writing to device file"
 override_gate = false
@@ -760,7 +760,7 @@ override_gate = false
 
 [[install_script_analysis]]
 id = "P-INSTALL-ROT13"
-pattern = 'tr\s.*n-za-m'
+pattern = '\btr\s.*n-za-m'
 points = 65
 description = "ROT13 encoding in install script"
 override_gate = false
@@ -774,7 +774,7 @@ override_gate = false
 
 [[install_script_analysis]]
 id = "P-INSTALL-LOG-CLEAR"
-pattern = 'rm\s+(-[rf]+\s+)?/var/log|truncate\s+.*\s+/var/log|>\s*/var/log/'
+pattern = '\brm\s+(-[rf]+\s+)?/var/log|truncate\s+.*\s+/var/log|>\s*/var/log/'
 points = 80
 description = "Log clearing in install script"
 override_gate = false
@@ -932,7 +932,7 @@ override_gate = true
 
 [[gtfobins_analysis]]
 id = "G-REVSHELL-GO"
-pattern = 'go\s+run\s.*net\.Dial'
+pattern = '\bgo\s+run\s.*net\.Dial'
 points = 80
 description = "Go reverse shell (net.Dial)"
 override_gate = true
@@ -948,7 +948,7 @@ override_gate = true
 
 [[gtfobins_analysis]]
 id = "G-BINDSHELL-NC"
-pattern = '(nc|ncat)\s+.*-l\s.*(-e|-c)\s|(nc|ncat)\s+.*(-e|-c)\s.*-l'
+pattern = '\b(nc|ncat)\s+.*-l\s.*(-e|-c)\s|\b(nc|ncat)\s+.*(-e|-c)\s.*-l'
 points = 90
 description = "Netcat bind shell (listen + exec)"
 override_gate = true
@@ -1071,7 +1071,7 @@ override_gate = true
 
 [[gtfobins_analysis]]
 id = "G-ZIP-EXEC"
-pattern = 'zip\s.*-TT\s'
+pattern = '\bzip\s.*-TT\s'
 points = 75
 description = "zip -TT command execution"
 override_gate = false
@@ -1422,7 +1422,7 @@ override_gate = false
 
 [[gtfobins_analysis]]
 id = "G-CP-SENSITIVE"
-pattern = 'cp\s+[^;|&]*/etc/(shadow|sudoers)|cp\s+[^;|&]*\.ssh/(id_rsa|id_ed25519|authorized_keys)'
+pattern = '\bcp\s+[^;|&]*/etc/(shadow|sudoers)|\bcp\s+[^;|&]*\.ssh/(id_rsa|id_ed25519|authorized_keys)'
 points = 65
 description = "Copying sensitive authentication files"
 override_gate = false
@@ -1468,7 +1468,7 @@ override_gate = true
 
 [[gtfobins_analysis]]
 id = "G-BINDSHELL-GO"
-pattern = 'go\s+run\s.*net\.Listen'
+pattern = '\bgo\s+run\s.*net\.Listen'
 points = 75
 description = "Go bind shell (net.Listen)"
 override_gate = false
@@ -1540,14 +1540,14 @@ override_gate = false
 
 [[gtfobins_analysis]]
 id = "G-M4-EXEC"
-pattern = 'm4\s.*esyscmd\b|m4\s.*syscmd\b'
+pattern = '\bm4\s.*esyscmd\b|\bm4\s.*syscmd\b'
 points = 60
 description = "m4 macro processor shell execution (esyscmd/syscmd)"
 override_gate = false
 
 [[gtfobins_analysis]]
 id = "G-IP-NETNS-EXEC"
-pattern = 'ip\s+netns\s+exec\s'
+pattern = '\bip\s+netns\s+exec\s'
 points = 55
 description = "ip netns exec (namespace command execution)"
 override_gate = false
@@ -1679,7 +1679,7 @@ override_gate = false
 
 [[gtfobins_analysis]]
 id = "G-LN-SENSITIVE"
-pattern = 'ln\s+(-sf?|--symbolic)\s+[^;|&]*/etc/(sudoers|shadow|passwd)|ln\s+(-sf?|--symbolic)\s+[^;|&]*\.ssh/'
+pattern = '\bln\s+(-sf?|--symbolic)\s+[^;|&]*/etc/(sudoers|shadow|passwd)|\bln\s+(-sf?|--symbolic)\s+[^;|&]*\.ssh/'
 points = 60
 description = "Symlink attack on sensitive files"
 override_gate = false
@@ -1725,7 +1725,7 @@ override_gate = false
 
 [[gtfobins_analysis]]
 id = "G-AB-EXFIL"
-pattern = 'ab\s+.*-p\s'
+pattern = '\bab\s+.*-p\s'
 points = 55
 description = "Apache Bench POST data exfiltration"
 override_gate = false
