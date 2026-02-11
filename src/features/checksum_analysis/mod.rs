@@ -142,7 +142,13 @@ fn find_array_suffixes(content: &str) -> Vec<String> {
         .collect()
 }
 
+static DYNAMIC_BASH_RE: LazyLock<Regex> = LazyLock::new(|| {
+    Regex::new(r"\$\(|`|\$\{[^}]*\[@\]|\$\{[^}]*\[\*\]").unwrap()
+});
+
 /// Count entries in a bash array like source=(...) or sha256sums=(...)
+/// Returns 0 for arrays with dynamic bash constructs (command substitution,
+/// array expansion) since static token counting would be unreliable.
 fn count_array_entries(content: &str, array_name: &str) -> usize {
     let pattern = format!(r"(?ms)^{array_name}=\((.*?)\)");
     let re = Regex::new(&pattern).unwrap();
@@ -150,6 +156,9 @@ fn count_array_entries(content: &str, array_name: &str) -> usize {
         return 0;
     };
     let body = &caps[1];
+    if DYNAMIC_BASH_RE.is_match(body) {
+        return 0;
+    }
     TOKEN_RE.find_iter(body).count()
 }
 
@@ -247,6 +256,20 @@ mod tests {
         // Package with only arch-specific checksum arrays should NOT fire P-NO-CHECKSUMS
         let ids = analyze("test-bin", "source_x86_64=('a.tar.gz')\nsha256sums_x86_64=('hash1')\n");
         assert!(!has(&ids, "P-NO-CHECKSUMS"), "arch-specific checksums should count, got: {ids:?}");
+    }
+
+    #[test]
+    fn dynamic_source_array_no_mismatch() {
+        // source uses bash array expansion — static counting is unreliable, skip mismatch
+        let ids = analyze("test-pkg", "source=(\"$_iso\"\n  \"${_fonts[@]/#/file://}\"\n  file://license.rtf)\nsha256sums=('hash1' 'hash2' 'hash3')\n");
+        assert!(!has(&ids, "P-CHECKSUM-MISMATCH"), "dynamic source array should not trigger mismatch, got: {ids:?}");
+    }
+
+    #[test]
+    fn dynamic_checksum_array_no_mismatch() {
+        // sha256sums uses command substitution — static counting is unreliable, skip mismatch
+        let ids = analyze("test-pkg", "source=('a.tar.gz' 'b.tar.gz')\nsha256sums=($(awk \"BEGIN{for(c=0;c<2;c++) printf \\\"SKIP\\n\\\"}\"))\n");
+        assert!(!has(&ids, "P-CHECKSUM-MISMATCH"), "dynamic checksum array should not trigger mismatch, got: {ids:?}");
     }
 
     #[test]

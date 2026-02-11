@@ -4,14 +4,14 @@
 
 [[pkgbuild_analysis]]
 id = "P-CURL-PIPE"
-pattern = 'curl\s[^|]*\|\s*(ba)?sh'
+pattern = 'curl\s[^|\n]*\|\s*(ba)?sh'
 points = 90
 description = "curl output piped to shell (download-and-execute)"
 override_gate = true
 
 [[pkgbuild_analysis]]
 id = "P-WGET-PIPE"
-pattern = 'wget\s[^|]*\|\s*(ba)?sh'
+pattern = 'wget\s[^|\n]*\|\s*(ba)?sh'
 points = 90
 description = "wget output piped to shell (download-and-execute)"
 override_gate = true
@@ -25,7 +25,7 @@ override_gate = true
 
 [[pkgbuild_analysis]]
 id = "P-REVSHELL-NC"
-pattern = '\b(nc|ncat)\s+[^;&|]*(-e|-c)\s'
+pattern = '\b(nc|ncat)\s+[^;&|\n]*(-e|-c)\s'
 points = 95
 description = "Netcat reverse shell"
 override_gate = true
@@ -151,21 +151,21 @@ override_gate = false
 
 [[pkgbuild_analysis]]
 id = "P-CURL-PIPE-PYTHON"
-pattern = 'curl\s[^|]*\|\s*python[23]?'
+pattern = 'curl\s[^|\n]*\|\s*python[23]?'
 points = 90
 description = "curl output piped to Python interpreter (download-and-execute)"
 override_gate = true
 
 [[pkgbuild_analysis]]
 id = "P-CURL-PIPE-PERL"
-pattern = 'curl\s[^|]*\|\s*perl'
+pattern = 'curl\s[^|\n]*\|\s*perl'
 points = 90
 description = "curl output piped to Perl interpreter (download-and-execute)"
 override_gate = true
 
 [[pkgbuild_analysis]]
 id = "P-WGET-PIPE-PYTHON"
-pattern = 'wget\s[^|]*\|\s*python[23]?'
+pattern = 'wget\s[^|\n]*\|\s*python[23]?'
 points = 90
 description = "wget output piped to Python interpreter (download-and-execute)"
 override_gate = true
@@ -273,7 +273,7 @@ override_gate = false
 
 [[pkgbuild_analysis]]
 id = "P-WGET-CHMOD-EXEC"
-pattern = '(curl|wget)\s[^;&|]*\S+\s*[;&|]+\s*chmod\s+(-\S+\s+)*\+x'
+pattern = '(curl|wget)\s[^;&|\n]*\S+\s*[;&|]+\s*chmod\s+(-\S+\s+)*\+x'
 points = 85
 description = "Download followed by chmod +x (download-and-execute preparation)"
 override_gate = false
@@ -342,7 +342,7 @@ override_gate = false
 # Pastebin URLs in PKGBUILD body (not just source array)
 [[pkgbuild_analysis]]
 id = "P-PASTEBIN-CODE"
-pattern = '(curl|wget)\s+[^;|&]*(pastebin\.com|paste\.ee|hastebin\.com|ptpb\.pw|ix\.io|dpaste\.com|ghostbin\.com|rentry\.co|termbin\.com)'
+pattern = '(curl|wget)\s+[^;|&\n]*(pastebin\.com|paste\.ee|hastebin\.com|ptpb\.pw|ix\.io|dpaste\.com|ghostbin\.com|rentry\.co|termbin\.com)'
 points = 75
 description = "Downloading from paste service in build/package code (mutable untrusted source)"
 override_gate = false
@@ -357,7 +357,7 @@ override_gate = false
 
 [[pkgbuild_analysis]]
 id = "P-CURL-POST-DATA"
-pattern = 'curl\s+[^;|&]*(-d\s+\$|--data[^;|&]*\$|-X\s+POST[^;|&]*\$)'
+pattern = 'curl\s+[^;|&\n]*(-d\s+\$|--data[^;|&\n]*\$|-X\s+POST[^;|&\n]*\$)'
 points = 55
 description = "curl POST with variable data (possible data exfiltration)"
 override_gate = false
@@ -365,7 +365,7 @@ override_gate = false
 # Archive extract-and-execute
 [[pkgbuild_analysis]]
 id = "P-ARCHIVE-EXEC"
-pattern = '(tar\s+[^;|&]*-?x[^;|&]*|unzip\s+[^;|&]*)[;&|]+\s*(\./|chmod\s+(-\S+\s+)*\+x)'
+pattern = '(tar\s+[^;|&\n]*-?x[^;|&\n]*|unzip\s+[^;|&\n]*)[;&|]+\s*(\./|chmod\s+(-\S+\s+)*\+x)'
 points = 55
 description = "Archive extraction followed by execution (extract-and-execute chain)"
 override_gate = false
@@ -627,7 +627,7 @@ override_gate = false
 
 [[install_script_analysis]]
 id = "P-INSTALL-PIPE-SHELL"
-pattern = 'curl[^|]*\|\s*(ba)?sh|wget[^|]*\|\s*(ba)?sh'
+pattern = 'curl[^|\n]*\|\s*(ba)?sh|wget[^|\n]*\|\s*(ba)?sh'
 points = 90
 description = "Download-and-execute in install script"
 override_gate = true
@@ -957,105 +957,105 @@ override_gate = true
 
 [[gtfobins_analysis]]
 id = "G-PIPE-NODE"
-pattern = '(curl|wget)\s[^|]*\|\s*node\b'
+pattern = '(curl|wget)\s[^|\n]*\|\s*node\b'
 points = 90
 description = "Download piped to Node.js interpreter"
 override_gate = true
 
 [[gtfobins_analysis]]
 id = "G-PIPE-RUBY"
-pattern = '(curl|wget)\s[^|]*\|\s*ruby\b'
+pattern = '(curl|wget)\s[^|\n]*\|\s*ruby\b'
 points = 90
 description = "Download piped to Ruby interpreter"
 override_gate = true
 
 [[gtfobins_analysis]]
 id = "G-PIPE-PHP"
-pattern = '(curl|wget)\s[^|]*\|\s*php\b'
+pattern = '(curl|wget)\s[^|\n]*\|\s*php\b'
 points = 90
 description = "Download piped to PHP interpreter"
 override_gate = true
 
 [[gtfobins_analysis]]
 id = "G-PIPE-LUA"
-pattern = '(curl|wget)\s[^|]*\|\s*lua\b'
+pattern = '(curl|wget)\s[^|\n]*\|\s*lua\b'
 points = 90
 description = "Download piped to Lua interpreter"
 override_gate = true
 
 [[gtfobins_analysis]]
 id = "G-PIPE-TCLSH"
-pattern = '(curl|wget)\s[^|]*\|\s*(tclsh|wish)\b'
+pattern = '(curl|wget)\s[^|\n]*\|\s*(tclsh|wish)\b'
 points = 90
 description = "Download piped to Tcl interpreter"
 override_gate = true
 
 [[gtfobins_analysis]]
 id = "G-PIPE-RSCRIPT"
-pattern = '(curl|wget)\s[^|]*\|\s*Rscript\b'
+pattern = '(curl|wget)\s[^|\n]*\|\s*Rscript\b'
 points = 90
 description = "Download piped to R interpreter"
 override_gate = true
 
 [[gtfobins_analysis]]
 id = "G-PIPE-JULIA"
-pattern = '(curl|wget)\s[^|]*\|\s*julia\b'
+pattern = '(curl|wget)\s[^|\n]*\|\s*julia\b'
 points = 90
 description = "Download piped to Julia interpreter"
 override_gate = true
 
 [[gtfobins_analysis]]
 id = "G-PIPE-AWK"
-pattern = '(curl|wget)\s[^|]*\|\s*(g?awk|mawk|nawk)\b'
+pattern = '(curl|wget)\s[^|\n]*\|\s*(g?awk|mawk|nawk)\b'
 points = 85
 description = "Download piped to Awk interpreter"
 override_gate = true
 
 [[gtfobins_analysis]]
 id = "G-PIPE-JJS"
-pattern = '(curl|wget)\s[^|]*\|\s*(jjs|jrunscript|jshell)\b'
+pattern = '(curl|wget)\s[^|\n]*\|\s*(jjs|jrunscript|jshell)\b'
 points = 90
 description = "Download piped to Java Nashorn/JShell"
 override_gate = true
 
 [[gtfobins_analysis]]
 id = "G-PIPE-KSH"
-pattern = '(curl|wget)\s[^|]*\|\s*ksh\b'
+pattern = '(curl|wget)\s[^|\n]*\|\s*ksh\b'
 points = 90
 description = "Download piped to Ksh shell"
 override_gate = true
 
 [[gtfobins_analysis]]
 id = "G-PIPE-CSH"
-pattern = '(curl|wget)\s[^|]*\|\s*(csh|tcsh)\b'
+pattern = '(curl|wget)\s[^|\n]*\|\s*(csh|tcsh)\b'
 points = 90
 description = "Download piped to C shell"
 override_gate = true
 
 [[gtfobins_analysis]]
 id = "G-PIPE-ZSH"
-pattern = '(curl|wget)\s[^|]*\|\s*zsh\b'
+pattern = '(curl|wget)\s[^|\n]*\|\s*zsh\b'
 points = 90
 description = "Download piped to Zsh shell"
 override_gate = true
 
 [[gtfobins_analysis]]
 id = "G-PIPE-FISH"
-pattern = '(curl|wget)\s[^|]*\|\s*fish\b'
+pattern = '(curl|wget)\s[^|\n]*\|\s*fish\b'
 points = 90
 description = "Download piped to Fish shell"
 override_gate = true
 
 [[gtfobins_analysis]]
 id = "G-PIPE-DASH"
-pattern = '(curl|wget)\s[^|]*\|\s*dash\b'
+pattern = '(curl|wget)\s[^|\n]*\|\s*dash\b'
 points = 90
 description = "Download piped to Dash shell"
 override_gate = true
 
 [[gtfobins_analysis]]
 id = "G-ALT-PIPE-SHELL"
-pattern = '(aria2c|lwp-download|lwp-request|finger|whois|tftp|smbclient)\s[^|]*\|\s*(ba)?sh\b'
+pattern = '(aria2c|lwp-download|lwp-request|finger|whois|tftp|smbclient)\s[^|\n]*\|\s*(ba)?sh\b'
 points = 90
 description = "Alternative downloader piped to shell"
 override_gate = true
@@ -1269,7 +1269,7 @@ override_gate = false
 
 [[gtfobins_analysis]]
 id = "G-DOWNLOAD-FTP"
-pattern = '\b(ftp|ncftp|lftp|psftp)\s+[^;|&]*(-i|-n|<<)'
+pattern = '\b(ftp|ncftp|lftp|psftp)\s+[^;|&\n]*(-i|-n|<<)'
 points = 40
 description = "Scripted FTP transfer (automated file download)"
 override_gate = false
@@ -1283,14 +1283,14 @@ override_gate = false
 
 [[gtfobins_analysis]]
 id = "G-DOWNLOAD-SCP"
-pattern = 'scp\s+[^;|&]*\S+@\S+:\S+'
+pattern = 'scp\s+[^;|&\n]*\S+@\S+:\S+'
 points = 35
 description = "SCP remote file copy"
 override_gate = false
 
 [[gtfobins_analysis]]
 id = "G-DOWNLOAD-RSYNC"
-pattern = 'rsync\s+[^;|&]*\S+@\S+:|rsync\s+[^;|&]*rsync://'
+pattern = 'rsync\s+[^;|&\n]*\S+@\S+:|rsync\s+[^;|&\n]*rsync://'
 points = 35
 description = "rsync from remote server"
 override_gate = false
@@ -1415,14 +1415,14 @@ override_gate = false
 
 [[gtfobins_analysis]]
 id = "G-TEE-SENSITIVE"
-pattern = 'tee\s+[^;|&]*(/etc/sudoers|/etc/passwd|/etc/shadow|/etc/cron|\.ssh/authorized_keys)'
+pattern = 'tee\s+[^;|&\n]*(/etc/sudoers|/etc/passwd|/etc/shadow|/etc/cron|\.ssh/authorized_keys)'
 points = 75
 description = "tee writing to sensitive system file"
 override_gate = false
 
 [[gtfobins_analysis]]
 id = "G-CP-SENSITIVE"
-pattern = '\bcp\s+[^;|&]*/etc/(shadow|sudoers)|\bcp\s+[^;|&]*\.ssh/(id_rsa|id_ed25519|authorized_keys)'
+pattern = '\bcp\s+[^;|&\n]*/etc/(shadow|sudoers)|\bcp\s+[^;|&\n]*\.ssh/(id_rsa|id_ed25519|authorized_keys)'
 points = 65
 description = "Copying sensitive authentication files"
 override_gate = false
@@ -1626,7 +1626,7 @@ override_gate = false
 
 [[gtfobins_analysis]]
 id = "G-DOWNLOAD-SFTP"
-pattern = 'sftp\s+[^;|&]*\S+@\S+'
+pattern = 'sftp\s+[^;|&\n]*\S+@\S+'
 points = 35
 description = "SFTP remote file transfer"
 override_gate = false
@@ -1672,14 +1672,14 @@ override_gate = false
 
 [[gtfobins_analysis]]
 id = "G-CHOWN-SENSITIVE"
-pattern = 'chown\s+[^;|&]*/etc/(shadow|sudoers|passwd)|chown\s+[^;|&]*\.ssh/'
+pattern = 'chown\s+[^;|&\n]*/etc/(shadow|sudoers|passwd)|chown\s+[^;|&\n]*\.ssh/'
 points = 65
 description = "chown on sensitive authentication files"
 override_gate = false
 
 [[gtfobins_analysis]]
 id = "G-LN-SENSITIVE"
-pattern = '\bln\s+(-sf?|--symbolic)\s+[^;|&]*/etc/(sudoers|shadow|passwd)|\bln\s+(-sf?|--symbolic)\s+[^;|&]*\.ssh/'
+pattern = '\bln\s+(-sf?|--symbolic)\s+[^;|&\n]*/etc/(sudoers|shadow|passwd)|\bln\s+(-sf?|--symbolic)\s+[^;|&\n]*\.ssh/'
 points = 60
 description = "Symlink attack on sensitive files"
 override_gate = false
