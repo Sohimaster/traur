@@ -12,6 +12,7 @@ use std::collections::HashSet;
 use std::process::Command;
 use colored::Colorize;
 use traur::coordinator;
+use traur::shared::bulk;
 use traur::shared::config::{self, is_whitelisted_in};
 use traur::shared::output;
 use traur::shared::scoring::{ScanResult, Tier};
@@ -69,26 +70,65 @@ fn main() {
     let _ = writeln!(tty);
 
     // --- Phase 1: Collect results silently ---
-    let total_aur = aur_packages.len();
+
+    // Filter whitelisted packages first
+    let mut whitelisted_count: u32 = 0;
+    let to_scan: Vec<String> = aur_packages
+        .into_iter()
+        .filter(|pkg| {
+            if is_whitelisted_in(&config, pkg) {
+                whitelisted_count += 1;
+                false
+            } else {
+                true
+            }
+        })
+        .collect();
+
+    // Batch-fetch AUR metadata to separate real AUR packages from local-only ones
+    let metadata = bulk::batch_fetch_metadata(&to_scan);
+    let not_found: Vec<&str> = to_scan
+        .iter()
+        .filter(|n| !metadata.contains_key(n.as_str()))
+        .map(|n| n.as_str())
+        .collect();
+    if !not_found.is_empty() {
+        let _ = writeln!(
+            tty,
+            "  Skipping {} not on AUR: {}",
+            not_found.len(),
+            not_found.join(", ")
+        );
+    }
+    let scan_packages: Vec<String> = to_scan
+        .into_iter()
+        .filter(|n| metadata.contains_key(n.as_str()))
+        .collect();
+
+    let any_scanned = !scan_packages.is_empty();
+    let total_scan = scan_packages.len();
+
+    // Pre-fetch maintainer data for all packages
+    let maintainer_packages = bulk::prefetch_maintainer_packages(&metadata);
+
     let mut flagged: Vec<ScanResult> = Vec::new();
     let mut scan_errors: Vec<(String, String)> = Vec::new();
-    let mut whitelisted_count: u32 = 0;
     let mut tier_counts: [u32; 5] = [0, 0, 0, 0, 0]; // Trusted, Ok, Sketchy, Suspicious, Malicious
-    let mut any_scanned = false;
 
-    for (i, pkg) in aur_packages.iter().enumerate() {
-        if is_whitelisted_in(&config, pkg) {
-            whitelisted_count += 1;
-            continue;
-        }
-
-        any_scanned = true;
-
+    for (i, pkg) in scan_packages.iter().enumerate() {
         // Progress indicator (single line, overwritten each iteration)
-        let _ = write!(tty, "\r  Scanning {} ({}/{})...          ", pkg, i + 1, total_aur);
+        let _ = write!(tty, "\r  Scanning {} ({}/{})...          ", pkg, i + 1, total_scan);
         let _ = tty.flush();
 
-        match coordinator::build_context(pkg) {
+        let meta = metadata.get(pkg.as_str()).cloned().unwrap();
+        let maint_pkgs = meta
+            .maintainer
+            .as_deref()
+            .and_then(|m| maintainer_packages.get(m))
+            .cloned()
+            .unwrap_or_default();
+
+        match bulk::clone_with_retry(pkg, meta, maint_pkgs) {
             Ok(ctx) => {
                 let result = coordinator::run_analysis_with_config(&ctx, &config);
                 let idx = match result.tier {

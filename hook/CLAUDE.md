@@ -12,7 +12,8 @@ ALPM (pacman) hook integration for automatic pre-install scanning.
 1. pacman triggers the hook before any Install or Upgrade transaction
 2. ALPM passes matched package names to `traur-hook` via stdin (one per line)
 3. `traur-hook` filters out official repo packages using `pacman -Sl`
-4. Remaining AUR packages are scanned silently (progress indicator only)
+4. Batch-fetches AUR metadata to identify which packages actually exist on AUR; packages not found (e.g. local `-debug` split packages) are skipped with an info message
+5. Remaining AUR packages are scanned silently (progress indicator only)
 5. After all scans, a tier summary is printed (counts per tier)
 6. Decision logic:
    - **All TRUSTED/OK**: prints "All packages look clean.", exits 0 — no prompt
@@ -33,5 +34,5 @@ The hook binary is installed as `/usr/bin/traur-hook` by the package.
 
 - **Silent on clean**: TRUSTED/OK packages produce only a summary count. Detail is shown only for SKETCHY+ packages. No prompt when all packages are clean.
 - **Only MALICIOUS hard-blocks**: SKETCHY and SUSPICIOUS prompt the user [y/N] but don't require whitelisting. Only MALICIOUS packages force `traur allow` to proceed.
-- **Fail closed**: If a scan errors out (git clone timeout, network failure, etc.), the hook blocks the transaction. Unscanned packages are not allowed through. Git operations have a 30-second timeout to prevent indefinite hangs.
+- **Fail closed**: If a scan errors out (git clone timeout, network failure, etc.), the hook blocks the transaction. Unscanned packages are not allowed through. Git operations have a 30-second timeout to prevent indefinite hangs. Packages not found on AUR are skipped (not treated as errors) since they are locally-built packages (e.g. `-debug` split packages).
 - **Official repo skip**: `pacman -Sl` is fast and reliable for filtering. AUR packages are not in sync databases.
