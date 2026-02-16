@@ -30,7 +30,9 @@ pub fn write_text(w: &mut dyn Write, result: &ScanResult, verbose: bool) {
         let _ = writeln!(w, "  {} Override gate fired: {gate}", "!!".red().bold());
     }
 
-    if !result.signals.is_empty() {
+    if result.signals.is_empty() {
+        let _ = writeln!(w, "  No negative signals found.");
+    } else {
         let _ = writeln!(w, "  Negative signals:");
         for signal in &result.signals {
             let prefix = if signal.is_override_gate {

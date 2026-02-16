@@ -130,6 +130,9 @@ mod tests {
             prior_pkgbuild_content: None,
             git_log: vec![],
             maintainer_packages: vec![],
+            github_stars: None,
+            github_not_found: false,
+            aur_comments: vec![],
         };
         assert!(signal_ids(&ctx).is_empty());
     }
@@ -145,6 +148,9 @@ mod tests {
             prior_pkgbuild_content: None,
             git_log: vec![],
             maintainer_packages: vec![],
+            github_stars: None,
+            github_not_found: false,
+            aur_comments: vec![],
         };
         assert!(signal_ids(&ctx).is_empty());
     }
@@ -160,6 +166,9 @@ mod tests {
             prior_pkgbuild_content: None,
             git_log: vec![],
             maintainer_packages: vec![],
+            github_stars: None,
+            github_not_found: false,
+            aur_comments: vec![],
         };
         let ids = signal_ids(&ctx);
         assert!(has(&ids, "B-SUBMITTER-CHANGED"));
@@ -180,6 +189,9 @@ mod tests {
                 make_commit("original", ts - 180 * 86400),
             ],
             maintainer_packages: vec![],
+            github_stars: None,
+            github_not_found: false,
+            aur_comments: vec![],
         };
         let ids = signal_ids(&ctx);
         assert!(has(&ids, "B-SUBMITTER-CHANGED"));
@@ -200,6 +212,9 @@ mod tests {
                 make_commit("alice", ts - 30 * 86400),
             ],
             maintainer_packages: vec![],
+            github_stars: None,
+            github_not_found: false,
+            aur_comments: vec![],
         };
         let ids = signal_ids(&ctx);
         assert!(has(&ids, "B-SUBMITTER-CHANGED"));
@@ -220,6 +235,9 @@ mod tests {
                 make_commit("shared-author", ts - 180 * 86400),
             ],
             maintainer_packages: vec![],
+            github_stars: None,
+            github_not_found: false,
+            aur_comments: vec![],
         };
         let ids = signal_ids(&ctx);
         assert!(has(&ids, "B-SUBMITTER-CHANGED"));

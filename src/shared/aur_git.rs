@@ -20,17 +20,12 @@ pub fn ensure_repo(package_base: &str, cache_dir: &str) -> Result<PathBuf, Strin
     let repo_path = PathBuf::from(cache_dir).join(package_base);
 
     if repo_path.join(".git").exists() {
-        // Pull latest
-        let output = run_with_timeout(
+        // Pull latest — if it fails, use the cached version rather than erroring out
+        let _ = run_with_timeout(
             Command::new("git")
                 .args(["pull", "--ff-only"])
                 .current_dir(&repo_path),
-        )?;
-
-        if !output.status.success() {
-            let stderr = String::from_utf8_lossy(&output.stderr);
-            return Err(format!("git pull failed: {stderr}"));
-        }
+        );
     } else {
         // Shallow clone
         let url = format!("{AUR_GIT_BASE}/{package_base}.git");

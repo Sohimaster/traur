@@ -40,9 +40,9 @@ enum Commands {
         #[arg(short = 'v', long)]
         verbose: bool,
 
-        /// Show all packages (including LOW and MEDIUM)
-        #[arg(short = 'a', long)]
-        all: bool,
+        /// Only show flagged packages (SKETCHY and above)
+        #[arg(short = 'f', long)]
+        flagged_only: bool,
     },
     /// Whitelist a package (skip future scans)
     Allow {
@@ -96,8 +96,8 @@ fn main() {
             jobs,
             json,
             verbose,
-            all,
-        } => cmd_scan(package, pkgbuild, all_installed, jobs, json, verbose, all),
+            flagged_only,
+        } => cmd_scan(package, pkgbuild, all_installed, jobs, json, verbose, flagged_only),
         Commands::Allow { package } => cmd_allow(&package),
         Commands::Bench { count, jobs } => bench::run(count, jobs),
         Commands::Signals { json } => cmd_signals(json),
@@ -115,7 +115,7 @@ fn cmd_scan(
     jobs: usize,
     json: bool,
     verbose: bool,
-    all: bool,
+    flagged_only: bool,
 ) -> i32 {
     if let Some(path) = pkgbuild {
         let content = match std::fs::read_to_string(&path) {
@@ -144,7 +144,7 @@ fn cmd_scan(
     }
 
     // No package, no pkgbuild -> scan all installed AUR packages
-    cmd_scan_all_installed(jobs, json, verbose, all)
+    cmd_scan_all_installed(jobs, json, verbose, flagged_only)
 }
 
 fn cmd_scan_single(pkg: &str, json: bool, verbose: bool) -> i32 {
@@ -163,7 +163,7 @@ fn cmd_scan_single(pkg: &str, json: bool, verbose: bool) -> i32 {
     }
 }
 
-fn cmd_scan_all_installed(jobs: usize, json: bool, verbose: bool, all: bool) -> i32 {
+fn cmd_scan_all_installed(jobs: usize, json: bool, verbose: bool, flagged_only: bool) -> i32 {
     use crate::shared::bulk::{batch_fetch_metadata, clone_with_retry, prefetch_maintainer_packages};
     use crate::shared::scoring::{ScanResult, Tier};
     use colored::Colorize;
@@ -250,7 +250,7 @@ fn cmd_scan_all_installed(jobs: usize, json: bool, verbose: bool, all: bool) -> 
                     };
                     tier_counts[idx].fetch_add(1, Ordering::Relaxed);
 
-                    if all || scan.tier >= Tier::Sketchy {
+                    if !flagged_only || scan.tier >= Tier::Sketchy {
                         flagged.lock().unwrap().push(scan);
                     }
                 }
@@ -295,7 +295,7 @@ fn cmd_scan_all_installed(jobs: usize, json: bool, verbose: bool, all: bool) -> 
                 format!(
                     "=== {} {} ===",
                     flagged.len(),
-                    if all { "packages" } else { "flagged packages (SKETCHY+)" }
+                    if flagged_only { "flagged packages (SKETCHY+)" } else { "packages" }
                 )
                 .bold()
             );

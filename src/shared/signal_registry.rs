@@ -76,6 +76,17 @@ fn hardcoded_signals() -> Vec<SignalDef> {
         ("T-NEW-PACKAGE", Temporal, 25, "Package is very new (< 7 days old)", false),
         ("T-MALICIOUS-DIFF", Temporal, 55, "Latest commit introduces network code not present in prior history", false),
         ("T-AUTHOR-CHANGE", Temporal, 25, "Git history shows multiple different authors", false),
+        // aur_comments_analysis
+        ("M-COMMENTS-SECURITY", Metadata, 40, "Recent AUR comments contain security-related warnings", false),
+        // github_stars
+        ("M-GITHUB-STARS-ZERO", Metadata, 20, "Upstream GitHub repo has 0 stars", false),
+        ("M-GITHUB-STARS-LOW", Metadata, 10, "Upstream GitHub repo has very few stars (<10)", false),
+        ("M-GITHUB-NOT-FOUND", Metadata, 25, "Upstream URL points to GitHub but repo does not exist", false),
+        // pkgbuild_diff_analysis
+        ("T-DIFF-NEW-SUSPICIOUS", Temporal, 40, "Newly introduced suspicious pattern not in prior version", false),
+        ("T-DIFF-CHECKSUM-REMOVED", Temporal, 35, "Checksum array removed or all entries changed to SKIP", false),
+        ("T-DIFF-SOURCE-DOMAIN-CHANGED", Temporal, 30, "Source URLs changed to a different domain", false),
+        ("T-DIFF-MAJOR-REWRITE", Temporal, 15, ">50% of PKGBUILD lines changed (unusual for version bump)", false),
         // checksum_analysis
         ("P-NO-CHECKSUMS", Pkgbuild, 30, "No checksum array found in PKGBUILD", false),
         ("P-SKIP-ALL", Pkgbuild, 25, "All checksums are SKIP (no integrity verification)", false),

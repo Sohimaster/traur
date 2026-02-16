@@ -138,6 +138,9 @@ mod tests {
             prior_pkgbuild_content: None,
             git_log: vec![make_commit("user", ts - 86400, None)],
             maintainer_packages: vec![],
+            github_stars: None,
+            github_not_found: false,
+            aur_comments: vec![],
         };
         let ids: Vec<String> = GitHistoryAnalysis.analyze(&ctx).iter().map(|s| s.id.clone()).collect();
         assert!(has(&ids, "T-SINGLE-COMMIT"));
@@ -157,6 +160,9 @@ mod tests {
                 make_commit("original", ts - 86400 * 30, None),
             ],
             maintainer_packages: vec![],
+            github_stars: None,
+            github_not_found: false,
+            aur_comments: vec![],
         };
         let ids: Vec<String> = GitHistoryAnalysis.analyze(&ctx).iter().map(|s| s.id.clone()).collect();
         assert!(has(&ids, "T-MALICIOUS-DIFF"));
@@ -176,6 +182,9 @@ mod tests {
                 make_commit("original-author", ts - 86400 * 30, None),
             ],
             maintainer_packages: vec![],
+            github_stars: None,
+            github_not_found: false,
+            aur_comments: vec![],
         };
         let ids: Vec<String> = GitHistoryAnalysis.analyze(&ctx).iter().map(|s| s.id.clone()).collect();
         assert!(has(&ids, "T-AUTHOR-CHANGE"));
@@ -195,6 +204,9 @@ mod tests {
                 make_commit("user", ts - 86400 * 30, None),
             ],
             maintainer_packages: vec![],
+            github_stars: None,
+            github_not_found: false,
+            aur_comments: vec![],
         };
         let ids: Vec<String> = GitHistoryAnalysis.analyze(&ctx).iter().map(|s| s.id.clone()).collect();
         assert!(!has(&ids, "T-MALICIOUS-DIFF"), "Should not flag when prior PKGBUILD already had network code");

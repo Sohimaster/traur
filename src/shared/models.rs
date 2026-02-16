@@ -9,6 +9,9 @@ pub struct PackageContext {
     pub prior_pkgbuild_content: Option<String>,
     pub git_log: Vec<GitCommit>,
     pub maintainer_packages: Vec<AurPackage>,
+    pub github_stars: Option<u32>,
+    pub github_not_found: bool,
+    pub aur_comments: Vec<String>,
 }
 
 /// Package metadata from AUR RPC API v5.

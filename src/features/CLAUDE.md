@@ -30,6 +30,9 @@ Each signal should populate `matched_line: Option<String>` with the exact trigge
 | `shell_analysis` | Beyond-regex obfuscation in PKGBUILD + install scripts (var concat, indirect exec, char-by-char, data blobs, binary download) | Pkgbuild | 0.45 |
 | `gtfobins_analysis` | GTFOBins-derived patterns in PKGBUILD + install scripts (reverse shells, pipe-to-interpreter, non-obvious exec) | Pkgbuild | 0.45 |
 | `bin_source_verification` | -bin package source domain vs upstream URL mismatch | Behavioral | 0.25 |
+| `pkgbuild_diff_analysis` | PKGBUILD diff: new suspicious patterns, removed checksums, domain changes, rewrites | Temporal | 0.15 |
+| `github_stars` | GitHub upstream star count (zero, low, repo not found) | Metadata | 0.15 |
+| `aur_comments_analysis` | AUR comments scanning for security keywords | Metadata | 0.15 |
 
 ## Adding a new feature
 

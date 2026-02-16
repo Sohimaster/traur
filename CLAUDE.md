@@ -15,7 +15,7 @@ PackageContext (metadata + pkgbuild + git)
 
 **Features** (`src/features/`): Self-contained analysis modules, each implementing the `Feature` trait. Each detects specific security signals.
 
-**Shared** (`src/shared/`): Reusable components (AUR API client, git ops, scoring engine, pattern loader, cache, config, output).
+**Shared** (`src/shared/`): Reusable components (AUR API client, GitHub API client, AUR comments scraper, git ops, scoring engine, pattern loader, cache, config, output).
 
 **Coordinator** (`src/coordinator.rs`): Orchestrates features, collects signals, computes final score.
 
@@ -76,9 +76,14 @@ Use `/release <version>` in Claude Code to run the full release workflow (bump v
 | `src/features/shell_analysis/` | Beyond-regex static analysis (var concat, indirect exec, char-by-char, data blobs, binary download) |
 | `src/features/gtfobins_analysis/` | GTFOBins-derived patterns (117 patterns for legitimate binary abuse) |
 | `src/features/bin_source_verification/` | -bin package source domain vs upstream URL mismatch detection |
+| `src/features/pkgbuild_diff_analysis/` | PKGBUILD diff checking: new suspicious patterns, removed checksums, domain changes, major rewrites |
+| `src/features/github_stars/` | GitHub stars checking: zero/low stars, repo not found |
+| `src/features/aur_comments_analysis/` | AUR comments scanning for security-related keywords |
+| `src/shared/github.rs` | GitHub API client (star count, repo existence) |
+| `src/shared/aur_comments.rs` | AUR package page comment scraper |
 | `src/shared/signal_registry.rs` | Central registry of all signal definitions (pattern + hardcoded) |
 | `src/shared/config.rs` | User config: whitelist, ignored signals/categories |
-| `data/patterns.toml` | Regex pattern database (239 patterns) |
+| `data/patterns.toml` | Regex pattern database (239 patterns). Total signals: 279 (pattern + hardcoded) |
 | `src/bench.rs` | Batch benchmark (parallel scan, retry, stats) |
 | `hook/traur.hook` | ALPM hook definition |
 | `hook/traur-hook.rs` | Hook binary (filters AUR pkgs, runs scans) |

@@ -175,6 +175,9 @@ mod tests {
             prior_pkgbuild_content: None,
             git_log: vec![],
             maintainer_packages: vec![],
+            github_stars: None,
+            github_not_found: false,
+            aur_comments: vec![],
         };
         ChecksumAnalysis.analyze(&ctx).iter().map(|s| s.id.clone()).collect()
     }
@@ -232,6 +235,9 @@ mod tests {
             prior_pkgbuild_content: None,
             git_log: vec![],
             maintainer_packages: vec![],
+            github_stars: None,
+            github_not_found: false,
+            aur_comments: vec![],
         };
         let signals = ChecksumAnalysis.analyze(&ctx);
         let mismatch = signals.iter().find(|s| s.id == "P-CHECKSUM-MISMATCH").unwrap();
@@ -283,6 +289,9 @@ mod tests {
             prior_pkgbuild_content: None,
             git_log: vec![],
             maintainer_packages: vec![],
+            github_stars: None,
+            github_not_found: false,
+            aur_comments: vec![],
         };
         let signals = ChecksumAnalysis.analyze(&ctx);
         let mismatch_count = signals.iter().filter(|s| s.id == "P-CHECKSUM-MISMATCH").count();

@@ -111,7 +111,7 @@ fn main() {
     // Pre-fetch maintainer data for all packages
     let maintainer_packages = bulk::prefetch_maintainer_packages(&metadata);
 
-    let mut flagged: Vec<ScanResult> = Vec::new();
+    let mut results: Vec<ScanResult> = Vec::new();
     let mut scan_errors: Vec<(String, String)> = Vec::new();
     let mut tier_counts: [u32; 5] = [0, 0, 0, 0, 0]; // Trusted, Ok, Sketchy, Suspicious, Malicious
 
@@ -139,10 +139,7 @@ fn main() {
                     Tier::Malicious => 4,
                 };
                 tier_counts[idx] += 1;
-
-                if result.tier >= Tier::Sketchy {
-                    flagged.push(result);
-                }
+                results.push(result);
             }
             Err(e) => {
                 scan_errors.push((pkg.clone(), e));
@@ -198,6 +195,31 @@ fn main() {
         let _ = writeln!(tty, "  {}", tier_parts.join("  "));
     }
 
+    // Compact one-line-per-package summary for all results
+    if !results.is_empty() {
+        results.sort_by(|a, b| a.score.cmp(&b.score));
+        let _ = writeln!(tty);
+        for result in &results {
+            let tier_str = match result.tier {
+                Tier::Trusted => format!("{:<10}", "TRUSTED").green().to_string(),
+                Tier::Ok => format!("{:<10}", "OK").yellow().to_string(),
+                Tier::Sketchy => format!("{:<10}", "SKETCHY").truecolor(255, 165, 0).to_string(),
+                Tier::Suspicious => format!("{:<10}", "SUSPICIOUS").red().to_string(),
+                Tier::Malicious => format!("{:<10}", "MALICIOUS").red().bold().to_string(),
+            };
+            let sig_info = if result.signals.is_empty() {
+                String::new()
+            } else {
+                format!(" [{} signal{}]", result.signals.len(), if result.signals.len() == 1 { "" } else { "s" })
+            };
+            let _ = writeln!(
+                tty,
+                "  {} {} ({}/100){}",
+                tier_str, result.package, result.score, sig_info
+            );
+        }
+    }
+
     // Print scan errors
     if !scan_errors.is_empty() {
         let _ = writeln!(tty);
@@ -208,10 +230,10 @@ fn main() {
 
     let has_malicious = tier_counts[4] > 0;
     let has_flagged = tier_counts[2] > 0 || tier_counts[3] > 0; // SKETCHY or SUSPICIOUS
+    let flagged: Vec<&ScanResult> = results.iter().filter(|r| r.tier >= Tier::Sketchy).collect();
 
     // Case 2: MALICIOUS detected -> hard block, must whitelist
     if has_malicious {
-        flagged.sort_by(|a, b| a.score.cmp(&b.score));
         let _ = writeln!(tty);
         for result in &flagged {
             output::write_text(&mut tty, result, false);
@@ -246,7 +268,6 @@ fn main() {
 
     // Case 4: SKETCHY or SUSPICIOUS -> show detail, prompt [y/N]
     if has_flagged {
-        flagged.sort_by(|a, b| a.score.cmp(&b.score));
         let _ = writeln!(tty);
         for result in &flagged {
             output::write_text(&mut tty, result, false);
@@ -274,7 +295,7 @@ fn main() {
     }
 
     // Case 5: All clean -> no prompt
-    let _ = writeln!(tty, "  {}", "All packages look clean.".green());
+    let _ = writeln!(tty, "\n  {}", "All packages look clean.".green());
 }
 
 /// Get all package names from official sync databases in one call.

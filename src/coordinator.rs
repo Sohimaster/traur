@@ -19,7 +19,7 @@ pub fn scan_package(package_name: &str, json: bool, verbose: bool) -> Result<Tie
 
 /// Build a PackageContext by fetching all data needed for analysis.
 pub fn build_context(package_name: &str) -> Result<PackageContext, String> {
-    use crate::shared::{aur_git, aur_rpc, cache};
+    use crate::shared::{aur_comments, aur_git, aur_rpc, cache, github};
 
     let metadata = aur_rpc::fetch_package_info(package_name)?;
 
@@ -60,6 +60,17 @@ pub fn build_context(package_name: &str) -> Result<PackageContext, String> {
         .and_then(|m| aur_rpc::fetch_maintainer_packages(m).ok())
         .unwrap_or_default();
 
+    // Fetch GitHub stars if upstream URL points to GitHub
+    let (github_stars, github_not_found) = metadata
+        .url
+        .as_deref()
+        .and_then(|url| github::fetch_github_stars(url))
+        .map(|info| (if info.found { Some(info.stars) } else { None }, !info.found))
+        .unwrap_or((None, false));
+
+    // Fetch recent AUR comments
+    let aur_comments = aur_comments::fetch_recent_comments(package_base);
+
     Ok(PackageContext {
         name: package_name.to_string(),
         metadata: Some(metadata),
@@ -68,6 +79,9 @@ pub fn build_context(package_name: &str) -> Result<PackageContext, String> {
         prior_pkgbuild_content,
         git_log,
         maintainer_packages,
+        github_stars,
+        github_not_found,
+        aur_comments,
     })
 }
 
@@ -78,7 +92,7 @@ pub fn build_context_prefetched(
     metadata: crate::shared::models::AurPackage,
     maintainer_packages: Vec<crate::shared::models::AurPackage>,
 ) -> Result<PackageContext, String> {
-    use crate::shared::{aur_git, cache};
+    use crate::shared::{aur_comments, aur_git, cache, github};
 
     let package_base = metadata
         .package_base
@@ -106,6 +120,15 @@ pub fn build_context_prefetched(
         None
     };
 
+    let (gh_stars, gh_not_found) = metadata
+        .url
+        .as_deref()
+        .and_then(|url| github::fetch_github_stars(url))
+        .map(|info| (if info.found { Some(info.stars) } else { None }, !info.found))
+        .unwrap_or((None, false));
+
+    let comments = aur_comments::fetch_recent_comments(package_base);
+
     Ok(PackageContext {
         name: package_name.to_string(),
         metadata: Some(metadata),
@@ -114,6 +137,9 @@ pub fn build_context_prefetched(
         prior_pkgbuild_content: prior,
         git_log: log,
         maintainer_packages,
+        github_stars: gh_stars,
+        github_not_found: gh_not_found,
+        aur_comments: comments,
     })
 }
 
@@ -127,6 +153,9 @@ pub fn scan_pkgbuild(name: &str, pkgbuild_content: &str) -> ScanResult {
         prior_pkgbuild_content: None,
         git_log: Vec::new(),
         maintainer_packages: Vec::new(),
+        github_stars: None,
+        github_not_found: false,
+        aur_comments: vec![],
     };
     run_analysis(&ctx)
 }

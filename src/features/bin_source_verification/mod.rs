@@ -213,6 +213,9 @@ mod tests {
             prior_pkgbuild_content: None,
             git_log: vec![],
             maintainer_packages: vec![],
+            github_stars: None,
+            github_not_found: false,
+            aur_comments: vec![],
         };
         BinSourceVerification.analyze(&ctx)
     }

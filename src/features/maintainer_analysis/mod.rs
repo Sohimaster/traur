@@ -111,6 +111,9 @@ mod tests {
             prior_pkgbuild_content: None,
             git_log: vec![],
             maintainer_packages: vec![pkg],
+            github_stars: None,
+            github_not_found: false,
+            aur_comments: vec![],
         };
         let ids: Vec<String> = MaintainerAnalysis.analyze(&ctx).iter().map(|s| s.id.clone()).collect();
         assert!(has(&ids, "B-MAINTAINER-NEW"));
@@ -128,6 +131,9 @@ mod tests {
             prior_pkgbuild_content: None,
             git_log: vec![],
             maintainer_packages: vec![pkg],
+            github_stars: None,
+            github_not_found: false,
+            aur_comments: vec![],
         };
         let ids: Vec<String> = MaintainerAnalysis.analyze(&ctx).iter().map(|s| s.id.clone()).collect();
         assert!(has(&ids, "B-MAINTAINER-SINGLE"));
@@ -149,6 +155,9 @@ mod tests {
             prior_pkgbuild_content: None,
             git_log: vec![],
             maintainer_packages: pkgs,
+            github_stars: None,
+            github_not_found: false,
+            aur_comments: vec![],
         };
         let ids: Vec<String> = MaintainerAnalysis.analyze(&ctx).iter().map(|s| s.id.clone()).collect();
         assert!(has(&ids, "B-MAINTAINER-BATCH"));
