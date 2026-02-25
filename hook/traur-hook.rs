@@ -195,28 +195,12 @@ fn main() {
         let _ = writeln!(tty, "  {}", tier_parts.join("  "));
     }
 
-    // Compact one-line-per-package summary for all results
+    // Full detail for all results
     if !results.is_empty() {
         results.sort_by(|a, b| a.score.cmp(&b.score));
-        let _ = writeln!(tty);
         for result in &results {
-            let tier_str = match result.tier {
-                Tier::Trusted => format!("{:<10}", "TRUSTED").green().to_string(),
-                Tier::Ok => format!("{:<10}", "OK").yellow().to_string(),
-                Tier::Sketchy => format!("{:<10}", "SKETCHY").truecolor(255, 165, 0).to_string(),
-                Tier::Suspicious => format!("{:<10}", "SUSPICIOUS").red().to_string(),
-                Tier::Malicious => format!("{:<10}", "MALICIOUS").red().bold().to_string(),
-            };
-            let sig_info = if result.signals.is_empty() {
-                String::new()
-            } else {
-                format!(" [{} signal{}]", result.signals.len(), if result.signals.len() == 1 { "" } else { "s" })
-            };
-            let _ = writeln!(
-                tty,
-                "  {} {} ({}/100){}",
-                tier_str, result.package, result.score, sig_info
-            );
+            let _ = writeln!(tty);
+            output::write_text(&mut tty, result, false);
         }
     }
 
@@ -230,15 +214,10 @@ fn main() {
 
     let has_malicious = tier_counts[4] > 0;
     let has_flagged = tier_counts[2] > 0 || tier_counts[3] > 0; // SKETCHY or SUSPICIOUS
-    let flagged: Vec<&ScanResult> = results.iter().filter(|r| r.tier >= Tier::Sketchy).collect();
 
     // Case 2: MALICIOUS detected -> hard block, must whitelist
     if has_malicious {
         let _ = writeln!(tty);
-        for result in &flagged {
-            output::write_text(&mut tty, result, false);
-            let _ = writeln!(tty);
-        }
         let _ = writeln!(
             tty,
             "{}",
@@ -266,14 +245,9 @@ fn main() {
         std::process::exit(1);
     }
 
-    // Case 4: SKETCHY or SUSPICIOUS -> show detail, prompt [y/N]
+    // Case 4: SKETCHY or SUSPICIOUS -> prompt [y/N]
     if has_flagged {
         let _ = writeln!(tty);
-        for result in &flagged {
-            output::write_text(&mut tty, result, false);
-            let _ = writeln!(tty);
-        }
-
         let _ = write!(tty, "{} ", "traur: Continue with installation? [y/N]".bold());
         let _ = tty.flush();
 
