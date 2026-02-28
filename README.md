@@ -1,53 +1,59 @@
-# traur
+# traur-x (Experimental)
 
-Trust scoring for AUR packages, written in Rust. Analyzes PKGBUILDs, install scripts, source URLs, metadata, and git history to score how much you should trust a package before installing it. Includes an ALPM hook that automatically scans packages before any install or upgrade transaction.
+> [!WARNING]
+> **EXPERIMENTAL PROJECT:** This project is currently undergoing a major architectural migration from simple point-based scoring to complex **rule-based multi-signal detection**. It is in an unstable state and **MUST NOT** be part of any production or security-critical workflow.
+
+**traur-x** is an experimental engine for AUR package analysis. Instead of relying on individual point scores, it is moving toward a YARA-inspired model where rules evaluate multiple signals (Metadata, Pkgbuild, Behavioral, Temporal) in context to produce high-confidence security verdicts.
 
 <img width="859" height="640" alt="image" src="https://github.com/user-attachments/assets/768915bd-4aa2-4450-96c7-408e73e0d103" />
 
+## Current Status: Migration in Progress
 
+We are currently migrating all legacy signals into a unified Rule Engine. This allows for coordinated detection (e.g., "Flag as Malicious only if *both* a download-and-execute pattern exists *and* the maintainer is new").
 
+## Verdict Levels (Experimental)
 
-## Installation
+| Verdict | Level | Action | Description |
+|---------|-------|--------|-------------|
+| **TRUSTED** | 0 | Allow | Explicitly whitelisted or high-reputation community package. |
+| **OK** | 1 | Allow | No rules matched. |
+| **SUSPICIOUS**| 2 | Prompt | Heuristics matched potential risk patterns. |
+| **MALICIOUS** | 3 | Block | High-confidence match for known attack vectors. |
+
+## Usage (Development Only)
 
 ```bash
-paru -S traur
+# Scan a package using the experimental rule engine
+traur scan <package>
+
+# Benchmark against the latest AUR metadata dump
+traur bench --count 100
 ```
 
-## Usage
+## How it Works (New Architecture)
 
-```bash
-traur scan                # scan all installed aur packages
-traur scan <package>      # scan a package
-traur allow <package>     # whitelist a package
+The engine now supports **Multi-Signal Rules** implemented in Rhai. A single rule can now inspect:
+1. **Metadata:** Votes, popularity, out-of-date status, maintainer age.
+2. **Pkgbuild:** Shell patterns, obfuscation, network calls.
+3. **Behavioral:** Install script hooks, systemd persistence.
+4. **Temporal:** Git history anomalies, sudden author changes.
+
+### Example Rule Logic
+```javascript
+// Rules can now correlate different data points
+if pkg.pkgbuild_content.contains("curl | bash") && pkg.metadata.num_votes < 5 {
+    return [#{ verdict: "malicious", reason: "Unverified pipe-to-shell in low-reputation package" }];
+}
 ```
 
-## How it works
+## Detection Coverage
 
-12 independent features emit scored signals per package:
+Currently focusing on patterns derived from real AUR incidents:
+- **Coordinated Attacks:** Browser impersonation + RAT distribution.
+- **Supply Chain:** Orphan takeover + suspicious source updates.
+- **Obfuscation:** Complex shell redirects and dynamic code execution.
 
-| Feature | What it checks |
-|---------|---------------|
-| PKGBUILD analysis | Dangerous shell code |
-| Install script analysis | Suspicious .install hooks |
-| Source URL analysis | Untrusted source domains |
-| Checksum analysis | Missing, skipped, or weak checksums |
-| Metadata analysis | AUR votes, popularity, maintainer status |
-| Name analysis | Typosquatting and brand impersonation |
-| Maintainer analysis | New accounts, batch uploads |
-| Orphan takeover analysis | Submitter != maintainer, orphan takeover patterns |
-| Git history analysis | New network code, author changes |
-| Shell analysis | Beyond-regex obfuscation (var concat, indirect exec, data blobs) |
-| GTFOBins analysis | Legitimate binary abuse |
-| Bin source verification | -bin package source domain vs upstream URL mismatch |
-
-## Detection coverage
-
-Patterns derived from real AUR malware incidents:
-- **CHAOS RAT (2025)** — browser impersonation packages, RAT distribution
-- **Google Chrome RAT (2025)** — .install script, Python download+execute
-- **Acroread (2018)** — orphan takeover, curl from paste service, systemd persistence
-
-Categories: download-and-execute, reverse shells, credential theft, persistence mechanisms, privilege escalation, C2/exfiltration, cryptocurrency mining, code obfuscation, kernel module loading, environment variable theft, system reconnaissance.
+> PS: I'm noob in rust
 
 ## License
 

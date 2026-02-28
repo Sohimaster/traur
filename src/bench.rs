@@ -4,7 +4,8 @@ use crate::shared::bulk::{
 };
 use crate::shared::models::MetaDumpPackage;
 use crate::shared::output;
-use crate::shared::scoring::{ScanResult, Tier};
+use crate::shared::rules::Verdict;
+use crate::shared::scoring::ScanResult;
 use colored::Colorize;
 use indicatif::{ProgressBar, ProgressStyle};
 use rayon::prelude::*;
@@ -19,7 +20,7 @@ struct BenchStats {
     total: usize,
     scanned: usize,
     errors: usize,
-    tier_counts: [usize; 5],
+    tier_counts: [usize; 4],
     total_time: Duration,
     prefetch_time: Duration,
     clone_time_us: u64,
@@ -100,7 +101,7 @@ pub fn run(count: usize, jobs: usize) -> i32 {
     let scan_start = Instant::now();
 
     let error_count = AtomicU64::new(0);
-    let tier_counts: [AtomicU64; 5] = std::array::from_fn(|_| AtomicU64::new(0));
+    let tier_counts: [AtomicU64; 4] = std::array::from_fn(|_| AtomicU64::new(0));
     let clone_time_us = AtomicU64::new(0);
     let analysis_time_us = AtomicU64::new(0);
     let error_samples = std::sync::Mutex::new(Vec::<(String, String)>::new());
@@ -138,10 +139,10 @@ pub fn run(count: usize, jobs: usize) -> i32 {
 
             match result {
                 Ok(scan) => {
-                    let idx = tier_to_index(scan.tier);
+                    let idx = verdict_to_index(scan.verdict);
                     tier_counts[idx].fetch_add(1, Ordering::Relaxed);
 
-                    if scan.tier >= Tier::Sketchy {
+                    if matches!(scan.verdict, Verdict::Suspicious | Verdict::Malicious) {
                         flagged.lock().unwrap().push(scan);
                     }
                 }
@@ -177,12 +178,12 @@ pub fn run(count: usize, jobs: usize) -> i32 {
 
     print_report(&stats);
 
-    // Print detailed output for HIGH/CRITICAL/MALICIOUS packages
+    // Print detailed output for flagged packages
     let mut flagged = flagged.into_inner().unwrap();
     if !flagged.is_empty() {
-        flagged.sort_by(|a, b| a.score.cmp(&b.score));
+        flagged.sort_by(|a, b| a.verdict.cmp(&b.verdict));
         println!();
-        println!("{}", format!("=== {} flagged packages (SKETCHY+) ===", flagged.len()).bold());
+        println!("{}", format!("=== {} flagged packages (SUSPICIOUS+) ===", flagged.len()).bold());
         for result in &flagged {
             println!();
             output::print_text(result, false);
@@ -192,13 +193,12 @@ pub fn run(count: usize, jobs: usize) -> i32 {
     0
 }
 
-fn tier_to_index(tier: Tier) -> usize {
-    match tier {
-        Tier::Trusted => 0,
-        Tier::Ok => 1,
-        Tier::Sketchy => 2,
-        Tier::Suspicious => 3,
-        Tier::Malicious => 4,
+fn verdict_to_index(verdict: Verdict) -> usize {
+    match verdict {
+        Verdict::Trusted => 0,
+        Verdict::Ok => 1,
+        Verdict::Suspicious => 2,
+        Verdict::Malicious => 3,
     }
 }
 
@@ -261,9 +261,8 @@ fn print_report(stats: &BenchStats) {
     println!("{}", "  Trust distribution:".bold());
     println!("    TRUSTED:    {:>5}  ({:.1}%)", stats.tier_counts[0], pct(stats.tier_counts[0]));
     println!("    OK:         {:>5}  ({:.1}%)", stats.tier_counts[1], pct(stats.tier_counts[1]));
-    println!("    SKETCHY:    {:>5}  ({:.1}%)", stats.tier_counts[2], pct(stats.tier_counts[2]));
-    println!("    SUSPICIOUS: {:>5}  ({:.1}%)", stats.tier_counts[3], pct(stats.tier_counts[3]));
-    println!("    MALICIOUS:  {:>5}  ({:.1}%)", stats.tier_counts[4], pct(stats.tier_counts[4]));
+    println!("    SUSPICIOUS: {:>5}  ({:.1}%)", stats.tier_counts[2], pct(stats.tier_counts[2]));
+    println!("    MALICIOUS:  {:>5}  ({:.1}%)", stats.tier_counts[3], pct(stats.tier_counts[3]));
 
     if !stats.error_samples.is_empty() {
         println!();

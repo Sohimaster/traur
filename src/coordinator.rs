@@ -1,10 +1,10 @@
-use crate::features;
 use crate::shared::models::PackageContext;
 use crate::shared::output;
-use crate::shared::scoring::{self, ScanResult, Tier};
+use crate::shared::scoring::ScanResult;
+use crate::shared::rules::Verdict;
 
-/// Scan a package by name, printing results. Returns the computed tier.
-pub fn scan_package(package_name: &str, json: bool, verbose: bool) -> Result<Tier, String> {
+/// Scan a package by name, printing results. Returns the computed verdict.
+pub fn scan_package(package_name: &str, json: bool, verbose: bool) -> Result<Verdict, String> {
     let ctx = build_context(package_name)?;
     let result = run_analysis(&ctx);
 
@@ -14,7 +14,7 @@ pub fn scan_package(package_name: &str, json: bool, verbose: bool) -> Result<Tie
         output::print_text(&result, verbose);
     }
 
-    Ok(result.tier)
+    Ok(result.verdict)
 }
 
 /// Build a PackageContext by fetching all data needed for analysis.
@@ -160,7 +160,7 @@ pub fn scan_pkgbuild(name: &str, pkgbuild_content: &str) -> ScanResult {
     run_analysis(&ctx)
 }
 
-/// Run all registered features against the context and compute a score.
+/// Run all registered features against the context and compute a verdict.
 pub fn run_analysis(ctx: &PackageContext) -> ScanResult {
     let config = crate::shared::config::load_config();
     run_analysis_with_config(ctx, &config)
@@ -171,18 +171,64 @@ pub fn run_analysis_with_config(
     ctx: &PackageContext,
     config: &crate::shared::config::Config,
 ) -> ScanResult {
-    let all_features = features::all_features();
-
-    let mut all_signals = Vec::new();
-    for feature in &all_features {
-        let signals = feature.analyze(ctx);
-        all_signals.extend(signals);
+    use crate::shared::rules::Verdict;
+    
+    // Check git commit hash override first
+    if let Some(first_commit) = ctx.git_log.first() {
+        if is_hash_in_override_list(&first_commit.hash, config) {
+            return ScanResult {
+                package: ctx.name.clone(),
+                verdict: Verdict::Trusted,
+                fired_rule: Some("OVERRIDE-COMMIT-HASH".to_string()),
+                detections: Vec::new(),
+            };
+        }
     }
-
-    if !config.ignored.signals.is_empty() || !config.ignored.categories.is_empty() {
-        all_signals
-            .retain(|s| !crate::shared::config::is_signal_ignored(config, &s.id, &s.category));
+    
+    // Evaluate all rules and collect detections
+    let rules = crate::shared::rule_registry::all_rules();
+    let mut all_detections = Vec::new();
+    
+    for rule in &rules {
+        let detections = rule.evaluate(ctx);
+        all_detections.extend(detections);
     }
+    
+    // Add whitelist rule check (highest salience)
+    if let Some(whitelist_detection) = check_repo_maintainer_whitelist(ctx, config) {
+        all_detections.push(whitelist_detection);
+    }
+    
+    // Sort detections by salience (highest first)
+    all_detections.sort_by(|a, b| b.salience.cmp(&a.salience));
+    
+    // First detection with highest salience wins
+    let verdict = if let Some(detection) = all_detections.first() {
+        detection.verdict
+    } else {
+        Verdict::Ok // Default if no detections
+    };
+    
+    let fired_rule = all_detections.first().map(|d| d.rule_id.clone());
+    
+    ScanResult {
+        package: ctx.name.clone(),
+        verdict,
+        fired_rule,
+        detections: all_detections,
+    }
+}
 
-    scoring::compute_score(&ctx.name, &all_signals)
+fn is_hash_in_override_list(_hash: &str, _config: &crate::shared::config::Config) -> bool {
+    // TODO: Load from config or allowlist file
+    false
+}
+
+fn check_repo_maintainer_whitelist(
+    _ctx: &PackageContext,
+    _config: &crate::shared::config::Config,
+) -> Option<crate::shared::rules::Detection> {
+    // TODO: Load whitelist, check repo name + maintainer combo
+    // For now, return None (not in whitelist)
+    None
 }

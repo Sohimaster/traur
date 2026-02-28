@@ -136,7 +136,7 @@ fn cmd_scan(
         } else {
             shared::output::print_text(&result, verbose);
         }
-        return if result.tier >= shared::scoring::Tier::Suspicious { 1 } else { 0 };
+        return if matches!(result.verdict, shared::rules::Verdict::Suspicious | shared::rules::Verdict::Malicious) { 1 } else { 0 };
     }
 
     if let Some(pkg) = package {
@@ -149,11 +149,11 @@ fn cmd_scan(
 
 fn cmd_scan_single(pkg: &str, json: bool, verbose: bool) -> i32 {
     match coordinator::scan_package(pkg, json, verbose) {
-        Ok(tier) => {
-            use shared::scoring::Tier;
-            match tier {
-                Tier::Trusted | Tier::Ok | Tier::Sketchy => 0,
-                Tier::Suspicious | Tier::Malicious => 1,
+        Ok(verdict) => {
+            use shared::rules::Verdict;
+            match verdict {
+                Verdict::Trusted | Verdict::Ok => 0,
+                Verdict::Suspicious | Verdict::Malicious => 1,
             }
         }
         Err(e) => {
@@ -165,7 +165,8 @@ fn cmd_scan_single(pkg: &str, json: bool, verbose: bool) -> i32 {
 
 fn cmd_scan_all_installed(jobs: usize, json: bool, verbose: bool, flagged_only: bool) -> i32 {
     use crate::shared::bulk::{batch_fetch_metadata, clone_with_retry, prefetch_maintainer_packages};
-    use crate::shared::scoring::{ScanResult, Tier};
+    use crate::shared::scoring::ScanResult;
+    use crate::shared::rules::Verdict;
     use colored::Colorize;
     use indicatif::{ProgressBar, ProgressStyle};
     use rayon::prelude::*;
@@ -217,7 +218,7 @@ fn cmd_scan_all_installed(jobs: usize, json: bool, verbose: bool, flagged_only: 
             .progress_chars("##-"),
     );
 
-    let tier_counts: [AtomicU64; 5] = std::array::from_fn(|_| AtomicU64::new(0));
+    let tier_counts: [AtomicU64; 4] = std::array::from_fn(|_| AtomicU64::new(0));
     let error_count = AtomicU64::new(0);
     let flagged = std::sync::Mutex::new(Vec::<ScanResult>::new());
 
@@ -241,16 +242,15 @@ fn cmd_scan_all_installed(jobs: usize, json: bool, verbose: bool, flagged_only: 
 
             match result {
                 Ok(scan) => {
-                    let idx = match scan.tier {
-                        Tier::Trusted => 0,
-                        Tier::Ok => 1,
-                        Tier::Sketchy => 2,
-                        Tier::Suspicious => 3,
-                        Tier::Malicious => 4,
+                    let idx = match scan.verdict {
+                        Verdict::Trusted => 0,
+                        Verdict::Ok => 1,
+                        Verdict::Suspicious => 2,
+                        Verdict::Malicious => 3,
                     };
                     tier_counts[idx].fetch_add(1, Ordering::Relaxed);
 
-                    if !flagged_only || scan.tier >= Tier::Sketchy {
+                    if !flagged_only || matches!(scan.verdict, Verdict::Suspicious | Verdict::Malicious) {
                         flagged.lock().unwrap().push(scan);
                     }
                 }
@@ -271,7 +271,7 @@ fn cmd_scan_all_installed(jobs: usize, json: bool, verbose: bool, flagged_only: 
     let scanned = total - errors;
 
     if json {
-        flagged.sort_by(|a, b| a.score.cmp(&b.score));
+        flagged.sort_by(|a, b| a.verdict.cmp(&b.verdict));
         let json_str = serde_json::to_string_pretty(&flagged).expect("Failed to serialize");
         println!("{json_str}");
     } else {
@@ -279,23 +279,20 @@ fn cmd_scan_all_installed(jobs: usize, json: bool, verbose: bool, flagged_only: 
         println!("{}", "=== traur scan results ===".bold());
         println!("  Scanned: {} packages ({} errors)", scanned, errors);
         println!(
-            "  TRUSTED: {}  OK: {}  SKETCHY: {}  SUSPICIOUS: {}  MALICIOUS: {}",
+            "  TRUSTED: {}  OK: {}  SUSPICIOUS: {}  MALICIOUS: {}",
             tier_counts[0].load(Ordering::Relaxed),
             tier_counts[1].load(Ordering::Relaxed),
             tier_counts[2].load(Ordering::Relaxed),
             tier_counts[3].load(Ordering::Relaxed),
-            tier_counts[4].load(Ordering::Relaxed),
         );
 
         if !flagged.is_empty() {
-            flagged.sort_by(|a, b| a.score.cmp(&b.score));
             println!();
             println!(
                 "{}",
                 format!(
-                    "=== {} {} ===",
-                    flagged.len(),
-                    if flagged_only { "flagged packages (SKETCHY+)" } else { "packages" }
+                    "=== {} flagged packages ===",
+                    flagged.len()
                 )
                 .bold()
             );
@@ -309,8 +306,7 @@ fn cmd_scan_all_installed(jobs: usize, json: bool, verbose: bool, flagged_only: 
         }
     }
 
-    let has_critical = tier_counts[3].load(Ordering::Relaxed) > 0
-        || tier_counts[4].load(Ordering::Relaxed) > 0;
+    let has_critical = tier_counts[3].load(Ordering::Relaxed) > 0;
     if has_critical { 1 } else { 0 }
 }
 

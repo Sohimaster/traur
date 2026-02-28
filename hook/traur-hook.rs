@@ -15,7 +15,8 @@ use traur::coordinator;
 use traur::shared::bulk;
 use traur::shared::config::{self, is_whitelisted_in};
 use traur::shared::output;
-use traur::shared::scoring::{ScanResult, Tier};
+use traur::shared::rules::Verdict;
+use traur::shared::scoring::ScanResult;
 
 fn main() {
     // Force colored output — ALPM hooks inherit the terminal but colored
@@ -113,7 +114,7 @@ fn main() {
 
     let mut results: Vec<ScanResult> = Vec::new();
     let mut scan_errors: Vec<(String, String)> = Vec::new();
-    let mut tier_counts: [u32; 5] = [0, 0, 0, 0, 0]; // Trusted, Ok, Sketchy, Suspicious, Malicious
+    let mut verdict_counts: [u32; 4] = [0, 0, 0, 0]; // Trusted, Ok, Suspicious, Malicious
 
     for (i, pkg) in scan_packages.iter().enumerate() {
         // Progress indicator (single line, overwritten each iteration)
@@ -131,14 +132,13 @@ fn main() {
         match bulk::clone_with_retry(pkg, meta, maint_pkgs) {
             Ok(ctx) => {
                 let result = coordinator::run_analysis_with_config(&ctx, &config);
-                let idx = match result.tier {
-                    Tier::Trusted => 0,
-                    Tier::Ok => 1,
-                    Tier::Sketchy => 2,
-                    Tier::Suspicious => 3,
-                    Tier::Malicious => 4,
+                let idx = match result.verdict {
+                    Verdict::Trusted => 0,
+                    Verdict::Ok => 1,
+                    Verdict::Suspicious => 2,
+                    Verdict::Malicious => 3,
                 };
-                tier_counts[idx] += 1;
+                verdict_counts[idx] += 1;
                 results.push(result);
             }
             Err(e) => {
@@ -165,25 +165,23 @@ fn main() {
         return;
     }
 
-    // Print tier summary
-    let scanned: u32 = tier_counts.iter().sum();
+    // Print verdict summary
+    let scanned: u32 = verdict_counts.iter().sum();
     let _ = writeln!(tty, "  Scanned: {} package(s)", scanned);
 
-    let tier_labels = [
-        ("TRUSTED", tier_counts[0]),
-        ("OK", tier_counts[1]),
-        ("SKETCHY", tier_counts[2]),
-        ("SUSPICIOUS", tier_counts[3]),
-        ("MALICIOUS", tier_counts[4]),
+    let verdict_labels = [
+        ("TRUSTED", verdict_counts[0]),
+        ("OK", verdict_counts[1]),
+        ("SUSPICIOUS", verdict_counts[2]),
+        ("MALICIOUS", verdict_counts[3]),
     ];
-    let tier_parts: Vec<String> = tier_labels
+    let verdict_parts: Vec<String> = verdict_labels
         .iter()
         .filter(|(_, count)| *count > 0)
         .map(|(label, count)| {
             let colored_label = match *label {
                 "TRUSTED" => label.green().to_string(),
                 "OK" => label.yellow().to_string(),
-                "SKETCHY" => label.truecolor(255, 165, 0).to_string(),
                 "SUSPICIOUS" => label.red().to_string(),
                 "MALICIOUS" => label.red().bold().to_string(),
                 _ => label.to_string(),
@@ -191,13 +189,13 @@ fn main() {
             format!("{}: {}", colored_label, count)
         })
         .collect();
-    if !tier_parts.is_empty() {
-        let _ = writeln!(tty, "  {}", tier_parts.join("  "));
+    if !verdict_parts.is_empty() {
+        let _ = writeln!(tty, "  {}", verdict_parts.join("  "));
     }
 
     // Full detail for all results
     if !results.is_empty() {
-        results.sort_by(|a, b| a.score.cmp(&b.score));
+        results.sort_by(|a, b| a.verdict.cmp(&b.verdict));
         for result in &results {
             let _ = writeln!(tty);
             output::write_text(&mut tty, result, false);
@@ -212,8 +210,8 @@ fn main() {
         }
     }
 
-    let has_malicious = tier_counts[4] > 0;
-    let has_flagged = tier_counts[2] > 0 || tier_counts[3] > 0; // SKETCHY or SUSPICIOUS
+    let has_malicious = verdict_counts[3] > 0;
+    let has_flagged = verdict_counts[2] > 0; // SUSPICIOUS
 
     // Case 2: MALICIOUS detected -> hard block, must whitelist
     if has_malicious {
@@ -245,7 +243,7 @@ fn main() {
         std::process::exit(1);
     }
 
-    // Case 4: SKETCHY or SUSPICIOUS -> prompt [y/N]
+    // Case 4: SUSPICIOUS -> prompt [y/N]
     if has_flagged {
         let _ = writeln!(tty);
         let _ = write!(tty, "{} ", "traur: Continue with installation? [y/N]".bold());

@@ -47,6 +47,7 @@ pub struct MetaDumpPackage {
 /// A single git commit from the AUR package repo.
 #[derive(Debug, Clone)]
 pub struct GitCommit {
+    pub hash: String,
     pub author: String,
     pub timestamp: u64,
     pub diff: Option<String>,

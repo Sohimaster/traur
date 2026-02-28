@@ -1,5 +1,6 @@
 use std::io::Write;
-use crate::shared::scoring::{ScanResult, Tier};
+use crate::shared::scoring::ScanResult;
+use crate::shared::rules::Verdict;
 use colored::Colorize;
 
 /// Print scan result as colored terminal text to stderr.
@@ -9,48 +10,37 @@ pub fn print_text(result: &ScanResult, verbose: bool) {
 
 /// Write scan result as colored terminal text to an arbitrary writer.
 pub fn write_text(w: &mut dyn Write, result: &ScanResult, verbose: bool) {
-    let tier_colored = match result.tier {
-        Tier::Trusted => result.tier.to_string().green(),
-        Tier::Ok => result.tier.to_string().yellow(),
-        Tier::Sketchy => result.tier.to_string().truecolor(255, 165, 0), // orange
-        Tier::Suspicious => result.tier.to_string().red(),
-        Tier::Malicious => result.tier.to_string().red().bold(),
+    let verdict_colored = match result.verdict {
+        Verdict::Trusted => result.verdict.to_string().green(),
+        Verdict::Ok => result.verdict.to_string().yellow(),
+        Verdict::Suspicious => result.verdict.to_string().truecolor(255, 165, 0), // orange
+        Verdict::Malicious => result.verdict.to_string().red().bold(),
     };
 
     let _ = writeln!(
         w,
-        "{} {} (trust: {}/100)",
+        "{} {}",
         "traur:".bold(),
         result.package.bold(),
-        result.score
     );
-    let _ = writeln!(w, "  Trust: {tier_colored}");
+    let _ = writeln!(w, "  Verdict: {verdict_colored}");
 
-    if let Some(ref gate) = result.override_gate_fired {
-        let _ = writeln!(w, "  {} Override gate fired: {gate}", "!!".red().bold());
+    if let Some(ref rule) = result.fired_rule {
+        let _ = writeln!(w, "  Fired rule: {rule}");
     }
 
-    if result.signals.is_empty() {
-        let _ = writeln!(w, "  No negative signals found.");
+    if result.detections.is_empty() {
+        let _ = writeln!(w, "  No detections.");
     } else {
-        let _ = writeln!(w, "  Negative signals:");
-        for signal in &result.signals {
-            let prefix = if signal.is_override_gate {
-                "!!".red().bold().to_string()
-            } else if signal.points >= 60 {
-                "!!".red().to_string()
-            } else if signal.points >= 30 {
-                " !".yellow().to_string()
-            } else {
-                "  ".to_string()
-            };
+        let _ = writeln!(w, "  Detections:");
+        for detection in &result.detections {
             let _ = writeln!(
                 w,
-                "    {prefix} {}: {}",
-                signal.id, signal.description
+                "    {} [{:?}]: {} (salience: {})",
+                detection.rule_id, detection.verdict, detection.description, detection.salience
             );
             if verbose {
-                if let Some(ref line) = signal.matched_line {
+                if let Some(ref line) = detection.matched_line {
                     let _ = writeln!(w, "         {} {}", ">".dimmed(), line.dimmed());
                 }
             }

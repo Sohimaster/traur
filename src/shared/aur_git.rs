@@ -127,9 +127,8 @@ pub fn read_git_log(repo_path: &std::path::Path, max_commits: usize) -> Vec<GitC
 
     let mut lines = stdout.lines().peekable();
     while lines.peek().is_some() {
-        // hash
-        match lines.next() {
-            Some(h) if !h.is_empty() => {}
+        let hash = match lines.next() {
+            Some(h) if !h.is_empty() => h.to_string(),
             _ => break,
         };
         let author = lines.next().unwrap_or("").to_string();
@@ -147,6 +146,7 @@ pub fn read_git_log(repo_path: &std::path::Path, max_commits: usize) -> Vec<GitC
         }
 
         commits.push(GitCommit {
+            hash,
             author,
             timestamp,
             diff: None,

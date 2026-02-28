@@ -8,5 +8,7 @@ pub mod github;
 pub mod models;
 pub mod output;
 pub mod patterns;
+pub mod rule_registry;
+pub mod rules;
 pub mod scoring;
 pub mod signal_registry;

@@ -1,4 +1,5 @@
 use serde::Serialize;
+use crate::shared::rules::{Verdict, Detection};
 
 /// A signal emitted by a feature during analysis.
 #[derive(Debug, Clone, Serialize)]
@@ -21,204 +22,23 @@ pub enum SignalCategory {
     Temporal,
 }
 
-/// Trust tier derived from the final score.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize)]
-pub enum Tier {
-    Trusted,
-    Ok,
-    Sketchy,
-    Suspicious,
-    Malicious,
-}
-
 /// Complete result of scanning a package.
 #[derive(Debug, Serialize)]
 pub struct ScanResult {
     pub package: String,
-    pub score: u32,
-    pub tier: Tier,
-    pub signals: Vec<Signal>,
-    pub override_gate_fired: Option<String>,
+    pub verdict: Verdict,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub fired_rule: Option<String>,
+    pub detections: Vec<Detection>,
 }
 
-/// Category weights for the composite score.
-const WEIGHT_METADATA: f64 = 0.15;
-const WEIGHT_PKGBUILD: f64 = 0.45;
-const WEIGHT_BEHAVIORAL: f64 = 0.25;
-const WEIGHT_TEMPORAL: f64 = 0.15;
-
-/// Compute the final score and tier from a list of signals.
-pub fn compute_score(package_name: &str, signals: &[Signal]) -> ScanResult {
-    let weighted_score = compute_weighted(signals);
-
-    // Find the highest-scoring override gate
-    let best_override = signals
-        .iter()
-        .filter(|s| s.is_override_gate)
-        .max_by_key(|s| s.points);
-
-    if let Some(signal) = best_override {
-        // Use the higher of the override gate score and the weighted score
-        let risk = signal.points.max(weighted_score).min(100);
-        return ScanResult {
-            package: package_name.to_string(),
-            score: 100 - risk,
-            tier: Tier::Malicious,
-            signals: signals.to_vec(),
-            override_gate_fired: Some(signal.id.clone()),
-        };
-    }
-
-    let trust = 100 - weighted_score;
-    let tier = score_to_tier(trust);
-
-    ScanResult {
-        package: package_name.to_string(),
-        score: trust,
-        tier,
-        signals: signals.to_vec(),
-        override_gate_fired: None,
-    }
-}
-
-/// Compute the weighted composite score from signals (without override gate logic).
-fn compute_weighted(signals: &[Signal]) -> u32 {
-    let mut meta_total: u32 = 0;
-    let mut pkgbuild_total: u32 = 0;
-    let mut behavioral_total: u32 = 0;
-    let mut temporal_total: u32 = 0;
-
-    for signal in signals {
-        match signal.category {
-            SignalCategory::Metadata => meta_total += signal.points,
-            SignalCategory::Pkgbuild => pkgbuild_total += signal.points,
-            SignalCategory::Behavioral => behavioral_total += signal.points,
-            SignalCategory::Temporal => temporal_total += signal.points,
-        }
-    }
-
-    meta_total = meta_total.min(100);
-    pkgbuild_total = pkgbuild_total.min(100);
-    behavioral_total = behavioral_total.min(100);
-    temporal_total = temporal_total.min(100);
-
-    let weighted = (WEIGHT_METADATA * meta_total as f64)
-        + (WEIGHT_PKGBUILD * pkgbuild_total as f64)
-        + (WEIGHT_BEHAVIORAL * behavioral_total as f64)
-        + (WEIGHT_TEMPORAL * temporal_total as f64);
-
-    (weighted.round() as u32).min(100)
-}
-
-fn score_to_tier(trust: u32) -> Tier {
-    match trust {
-        0..=20 => Tier::Malicious,
-        21..=40 => Tier::Suspicious,
-        41..=60 => Tier::Sketchy,
-        61..=80 => Tier::Ok,
-        _ => Tier::Trusted,
-    }
-}
-
-impl std::fmt::Display for Tier {
+impl std::fmt::Display for Verdict {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Tier::Trusted => write!(f, "TRUSTED"),
-            Tier::Ok => write!(f, "OK"),
-            Tier::Sketchy => write!(f, "SKETCHY"),
-            Tier::Suspicious => write!(f, "SUSPICIOUS"),
-            Tier::Malicious => write!(f, "MALICIOUS"),
+            Verdict::Malicious => write!(f, "MALICIOUS"),
+            Verdict::Suspicious => write!(f, "SUSPICIOUS"),
+            Verdict::Ok => write!(f, "OK"),
+            Verdict::Trusted => write!(f, "TRUSTED"),
         }
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    fn signal(id: &str, category: SignalCategory, points: u32, override_gate: bool) -> Signal {
-        Signal {
-            id: id.to_string(),
-            category,
-            points,
-            description: String::new(),
-            is_override_gate: override_gate,
-            matched_line: None,
-        }
-    }
-
-    #[test]
-    fn no_signals_scores_full_trust() {
-        let result = compute_score("pkg", &[]);
-        assert_eq!(result.score, 100);
-        assert_eq!(result.tier, Tier::Trusted);
-        assert!(result.override_gate_fired.is_none());
-    }
-
-    #[test]
-    fn override_gate_picks_highest() {
-        let signals = vec![
-            signal("P-CURL-PIPE", SignalCategory::Pkgbuild, 90, true),
-            signal("P-REVSHELL-DEVTCP", SignalCategory::Pkgbuild, 95, true),
-        ];
-        let result = compute_score("pkg", &signals);
-        assert_eq!(result.tier, Tier::Malicious);
-        assert_eq!(result.override_gate_fired.as_deref(), Some("P-REVSHELL-DEVTCP"));
-        assert!(result.score <= 5, "Trust {} should be <= 5", result.score);
-    }
-
-    #[test]
-    fn override_gate_uses_weighted_when_higher() {
-        // Override gate (85) + lots of other signals that push weighted above 85
-        let signals = vec![
-            signal("P-REVSHELL-PYTHON", SignalCategory::Pkgbuild, 85, true),
-            signal("P-EVAL-BASE64", SignalCategory::Pkgbuild, 85, false),
-            signal("B-NAME-IMPERSONATE", SignalCategory::Behavioral, 65, false),
-            signal("M-VOTES-ZERO", SignalCategory::Metadata, 30, false),
-            signal("T-MALICIOUS-DIFF", SignalCategory::Temporal, 55, false),
-        ];
-        let result = compute_score("pkg", &signals);
-        assert_eq!(result.tier, Tier::Malicious);
-        // Weighted risk: 0.45*100 + 0.25*65 + 0.15*30 + 0.15*55 = 74
-        // Override gate risk: 85. Max(85, 74) = 85. Trust = 100 - 85 = 15
-        assert!(result.score <= 15, "Trust {} should be <= 15", result.score);
-    }
-
-    #[test]
-    fn category_caps_at_100() {
-        let signals = vec![
-            signal("P-A", SignalCategory::Pkgbuild, 80, false),
-            signal("P-B", SignalCategory::Pkgbuild, 80, false),
-        ];
-        let result = compute_score("pkg", &signals);
-        // Pkgbuild: min(160, 100) = 100 -> 0.45 * 100 = 45 risk -> 55 trust
-        assert_eq!(result.score, 55);
-        assert_eq!(result.tier, Tier::Sketchy);
-    }
-
-    #[test]
-    fn tier_boundaries() {
-        assert_eq!(score_to_tier(0), Tier::Malicious);
-        assert_eq!(score_to_tier(20), Tier::Malicious);
-        assert_eq!(score_to_tier(21), Tier::Suspicious);
-        assert_eq!(score_to_tier(40), Tier::Suspicious);
-        assert_eq!(score_to_tier(41), Tier::Sketchy);
-        assert_eq!(score_to_tier(60), Tier::Sketchy);
-        assert_eq!(score_to_tier(61), Tier::Ok);
-        assert_eq!(score_to_tier(80), Tier::Ok);
-        assert_eq!(score_to_tier(81), Tier::Trusted);
-        assert_eq!(score_to_tier(100), Tier::Trusted);
-    }
-
-    #[test]
-    fn min_trust_is_zero() {
-        let signals = vec![
-            signal("P", SignalCategory::Pkgbuild, 200, false),
-            signal("M", SignalCategory::Metadata, 200, false),
-            signal("B", SignalCategory::Behavioral, 200, false),
-            signal("T", SignalCategory::Temporal, 200, false),
-        ];
-        let result = compute_score("pkg", &signals);
-        assert_eq!(result.score, 0);
     }
 }

@@ -26,7 +26,6 @@ pub struct CompiledPattern {
     pub regex: Regex,
     pub points: u32,
     pub description: String,
-    pub override_gate: bool,
 }
 
 /// Load and compile patterns for a given section from the database.
@@ -48,7 +47,6 @@ pub fn load_patterns(section: &str) -> Vec<CompiledPattern> {
                 regex,
                 points: rule.points,
                 description: rule.description.clone(),
-                override_gate: rule.override_gate,
             })
         })
         .collect()
