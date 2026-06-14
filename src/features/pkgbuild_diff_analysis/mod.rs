@@ -12,6 +12,9 @@ static CHECKSUM_RE: LazyLock<Regex> =
 static SOURCE_RE: LazyLock<Regex> =
     LazyLock::new(|| Regex::new(r"(?m)^source(_[a-z0-9_]+)?\s*=\s*\(([^)]*)\)").unwrap());
 
+static DEP_RE: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"(?m)^[a-z]*depends(_[a-z0-9_]+)?\s*\+?=\s*\(([^)]*)\)").unwrap());
+
 static URL_DOMAIN_RE: LazyLock<Regex> =
     LazyLock::new(|| Regex::new(r#"https?://([^/\s'"]+)"#).unwrap());
 
@@ -36,6 +39,7 @@ impl Feature for PkgbuildDiffAnalysis {
         let mut signals = Vec::new();
 
         check_new_suspicious(new_content, old_content, &mut signals);
+        check_new_dangerous_dep(new_content, old_content, &mut signals);
         check_checksum_removed(new_content, old_content, &mut signals);
         check_source_domain_changed(new_content, old_content, &mut signals);
         check_major_rewrite(new_content, old_content, &mut signals);
@@ -66,6 +70,47 @@ fn check_new_suspicious(new: &str, old: &str, signals: &mut Vec<Signal>) {
             return; // one signal is enough
         }
     }
+}
+
+/// Flag newly added dangerous dependencies like npm or bun.
+fn check_new_dangerous_dep(new: &str, old: &str, signals: &mut Vec<Signal>) {
+    let old_deps = extract_dependencies(old);
+    let new_deps = extract_dependencies(new);
+
+    let added: HashSet<_> = new_deps.difference(&old_deps).collect();
+
+    for dangerous in &["npm", "bun"] {
+        if added.contains(&dangerous.to_string()) {
+            signals.push(Signal {
+                id: "T-DIFF-NEW-DEP-NPM-BUN".to_string(),
+                category: SignalCategory::Temporal,
+                points: 50,
+                description: format!("Newly added {} dependency (often used for supply chain attacks)", dangerous),
+                is_override_gate: false,
+                matched_line: new.lines()
+                    .find(|l| l.contains(dangerous) && (l.contains("depends") || l.contains("makedepends")))
+                    .map(|l| l.trim().to_string()),
+            });
+            return; // one signal is enough
+        }
+    }
+}
+
+/// Extract dependency names from *depends=() arrays.
+fn extract_dependencies(content: &str) -> HashSet<String> {
+    let mut deps = HashSet::new();
+    for cap in DEP_RE.captures_iter(content) {
+        let array_content = &cap[2];
+        for dep in array_content.split_whitespace() {
+            let dep = dep.trim_matches('\'').trim_matches('\"');
+            // Strip version constraints (e.g., 'npm>=10')
+            let name = dep.split(|c| c == '>' || c == '<' || c == '=').next().unwrap_or("");
+            if !name.is_empty() {
+                deps.insert(name.to_string());
+            }
+        }
+    }
+    deps
 }
 
 /// Flag if checksums were removed or all changed to SKIP.
@@ -280,6 +325,23 @@ mod tests {
         let old = "pkgname=test\nsource=('https://github.com/owner/repo/v1.tar.gz')";
         let new = "pkgname=test\nsource=('https://github.com/owner/repo/v2.tar.gz')";
         assert!(!has(&analyze(new, old), "T-DIFF-SOURCE-DOMAIN-CHANGED"));
+    }
+
+    #[test]
+    fn new_dangerous_dep_detected() {
+        let old = "pkgname=test\ndepends=('git')";
+        let new = "pkgname=test\ndepends=('git' 'npm')";
+        assert!(has(&analyze(new, old), "T-DIFF-NEW-DEP-NPM-BUN"));
+        
+        let new_bun = "pkgname=test\nmakedepends=('bun' 'gcc')";
+        assert!(has(&analyze(new_bun, old), "T-DIFF-NEW-DEP-NPM-BUN"));
+    }
+
+    #[test]
+    fn existing_dangerous_dep_no_signal() {
+        let old = "pkgname=test\ndepends=('npm')";
+        let new = "pkgname=test\ndepends=('npm' 'git')";
+        assert!(!has(&analyze(new, old), "T-DIFF-NEW-DEP-NPM-BUN"));
     }
 
     #[test]

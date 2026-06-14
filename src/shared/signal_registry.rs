@@ -84,6 +84,7 @@ fn hardcoded_signals() -> Vec<SignalDef> {
         ("M-GITHUB-NOT-FOUND", Metadata, 25, "Upstream URL points to GitHub but repo does not exist", false),
         // pkgbuild_diff_analysis
         ("T-DIFF-NEW-SUSPICIOUS", Temporal, 40, "Newly introduced suspicious pattern not in prior version", false),
+        ("T-DIFF-NEW-DEP-NPM-BUN", Temporal, 50, "Newly added npm or bun dependency (often used for supply chain attacks)", false),
         ("T-DIFF-CHECKSUM-REMOVED", Temporal, 35, "Checksum array removed or all entries changed to SKIP", false),
         ("T-DIFF-SOURCE-DOMAIN-CHANGED", Temporal, 30, "Source URLs changed to a different domain", false),
         ("T-DIFF-MAJOR-REWRITE", Temporal, 15, ">50% of PKGBUILD lines changed (unusual for version bump)", false),
