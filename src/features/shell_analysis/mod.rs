@@ -286,6 +286,8 @@ fn analyze_variable_resolution(
                         i + 1
                     ),
                     is_override_gate: true,
+                    is_critical: false,
+
                     matched_line: Some(line.trim().to_string()),
                 });
                 found_exec = true;
@@ -307,6 +309,8 @@ fn analyze_variable_resolution(
                     i + 1
                 ),
                 is_override_gate: false,
+                is_critical: false,
+
                 matched_line: Some(line.trim().to_string()),
             });
             found_cmd = true;
@@ -366,6 +370,8 @@ fn analyze_indirect_execution(
                     var_name, cmd
                 ),
                 is_override_gate: false,
+                is_critical: false,
+
                 matched_line,
             }];
         }
@@ -391,6 +397,8 @@ fn analyze_charbychar_construction(content: &str) -> Vec<Signal> {
                     i + 1
                 ),
                 is_override_gate: false,
+                is_critical: false,
+
                 matched_line: Some(line.trim().to_string()),
             }];
         }
@@ -431,6 +439,8 @@ fn analyze_data_blobs(content: &str) -> Vec<Signal> {
                 points: 50,
                 description: "embedded long hex string (possible encoded payload)".to_string(),
                 is_override_gate: false,
+                is_critical: false,
+
                 matched_line: Some(line.trim().to_string()),
             });
         }
@@ -448,6 +458,8 @@ fn analyze_data_blobs(content: &str) -> Vec<Signal> {
                     description: "embedded long base64 string (possible encoded payload)"
                         .to_string(),
                     is_override_gate: false,
+                    is_critical: false,
+
                     matched_line: Some(line.trim().to_string()),
                 });
             }
@@ -492,6 +504,8 @@ fn analyze_heredoc_entropy(content: &str) -> Vec<Signal> {
                             body.len()
                         ),
                         is_override_gate: false,
+                        is_critical: false,
+
                         matched_line: None,
                     }];
                 }
@@ -547,6 +561,8 @@ fn analyze_binary_download(content: &str) -> Vec<Signal> {
         points: 60,
         description: "downloads file and chmod +x with no compilation step".to_string(),
         is_override_gate: false,
+        is_critical: false,
+
         matched_line,
     }]
 }
@@ -567,6 +583,10 @@ mod tests {
             github_stars: None,
             github_not_found: false,
             aur_comments: vec![],
+                    maintainer_info: None,
+            has_orphan_takeover: false,
+            has_new_malicious_diff: false,
+            npm_info: None,
         };
         ShellAnalysis.analyze(&ctx).iter().map(|s| s.id.clone()).collect()
     }
@@ -859,6 +879,10 @@ package() {
             github_stars: None,
             github_not_found: false,
             aur_comments: vec![],
+                    maintainer_info: None,
+            has_orphan_takeover: false,
+            has_new_malicious_diff: false,
+            npm_info: None,
         };
         ShellAnalysis.analyze(&ctx).iter().map(|s| s.id.clone()).collect()
     }

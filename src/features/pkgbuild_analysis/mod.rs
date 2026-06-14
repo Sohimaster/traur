@@ -27,6 +27,7 @@ impl Feature for PkgbuildAnalysis {
                     points: pat.points,
                     description: pat.description.clone(),
                     is_override_gate: pat.override_gate,
+                    is_critical: pat.is_critical,
                     matched_line,
                 });
             }
@@ -52,6 +53,10 @@ mod tests {
             github_stars: None,
             github_not_found: false,
             aur_comments: vec![],
+                    maintainer_info: None,
+            has_orphan_takeover: false,
+            has_new_malicious_diff: false,
+            npm_info: None,
         };
         PkgbuildAnalysis.analyze(&ctx).iter().map(|s| s.id.clone()).collect()
     }

@@ -41,6 +41,7 @@ fn match_patterns(content: &str, id_prefix: &str, desc_suffix: &str) -> Vec<Sign
                     format!("{} {}", pat.description, desc_suffix)
                 },
                 is_override_gate: pat.override_gate,
+                is_critical: pat.is_critical,
                 matched_line,
             });
         }
@@ -65,6 +66,10 @@ mod tests {
             github_stars: None,
             github_not_found: false,
             aur_comments: vec![],
+                    maintainer_info: None,
+            has_orphan_takeover: false,
+            has_new_malicious_diff: false,
+            npm_info: None,
         };
         GtfobinsAnalysis.analyze(&ctx).iter().map(|s| s.id.clone()).collect()
     }
@@ -957,6 +962,10 @@ build() {
             github_stars: None,
             github_not_found: false,
             aur_comments: vec![],
+                    maintainer_info: None,
+            has_orphan_takeover: false,
+            has_new_malicious_diff: false,
+            npm_info: None,
         };
         GtfobinsAnalysis.analyze(&ctx).iter().map(|s| s.id.clone()).collect()
     }

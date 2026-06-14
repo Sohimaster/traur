@@ -6,6 +6,7 @@ pub mod cache;
 pub mod config;
 pub mod github;
 pub mod models;
+pub mod npm;
 pub mod output;
 pub mod patterns;
 pub mod scoring;

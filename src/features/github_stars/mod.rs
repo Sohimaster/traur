@@ -15,6 +15,8 @@ impl Feature for GitHubStars {
                 points: 25,
                 description: "Upstream URL points to GitHub but repo does not exist".to_string(),
                 is_override_gate: false,
+                is_critical: false,
+
                 matched_line: ctx
                     .metadata
                     .as_ref()
@@ -31,6 +33,8 @@ impl Feature for GitHubStars {
                     points: 20,
                     description: "Upstream GitHub repo has 0 stars".to_string(),
                     is_override_gate: false,
+                    is_critical: false,
+
                     matched_line: None,
                 });
             } else if stars < 10 {
@@ -40,6 +44,8 @@ impl Feature for GitHubStars {
                     points: 10,
                     description: format!("Upstream GitHub repo has very few stars ({stars})"),
                     is_override_gate: false,
+                    is_critical: false,
+
                     matched_line: None,
                 });
             }
@@ -69,6 +75,10 @@ mod tests {
             github_stars: stars,
             github_not_found: not_found,
             aur_comments: vec![],
+            maintainer_info: None,
+            has_orphan_takeover: false,
+            has_new_malicious_diff: false,
+            npm_info: None,
         };
         GitHubStars
             .analyze(&ctx)

@@ -32,6 +32,8 @@ impl Feature for MaintainerAnalysis {
                         "Maintainer has only 1 package, created {age_days} days ago"
                     ),
                     is_override_gate: false,
+                    is_critical: false,
+
                     matched_line: None,
                 });
             } else {
@@ -41,6 +43,8 @@ impl Feature for MaintainerAnalysis {
                     points: 15,
                     description: "Maintainer has only 1 package".to_string(),
                     is_override_gate: false,
+                    is_critical: false,
+
                     matched_line: None,
                 });
             }
@@ -62,6 +66,8 @@ impl Feature for MaintainerAnalysis {
                     "Maintainer created {recent_count} packages in the last 48 hours"
                 ),
                 is_override_gate: false,
+                is_critical: false,
+
                 matched_line: None,
             });
         }
@@ -114,6 +120,10 @@ mod tests {
             github_stars: None,
             github_not_found: false,
             aur_comments: vec![],
+                    maintainer_info: None,
+            has_orphan_takeover: false,
+            has_new_malicious_diff: false,
+            npm_info: None,
         };
         let ids: Vec<String> = MaintainerAnalysis.analyze(&ctx).iter().map(|s| s.id.clone()).collect();
         assert!(has(&ids, "B-MAINTAINER-NEW"));
@@ -134,6 +144,10 @@ mod tests {
             github_stars: None,
             github_not_found: false,
             aur_comments: vec![],
+                    maintainer_info: None,
+            has_orphan_takeover: false,
+            has_new_malicious_diff: false,
+            npm_info: None,
         };
         let ids: Vec<String> = MaintainerAnalysis.analyze(&ctx).iter().map(|s| s.id.clone()).collect();
         assert!(has(&ids, "B-MAINTAINER-SINGLE"));
@@ -158,6 +172,10 @@ mod tests {
             github_stars: None,
             github_not_found: false,
             aur_comments: vec![],
+                    maintainer_info: None,
+            has_orphan_takeover: false,
+            has_new_malicious_diff: false,
+            npm_info: None,
         };
         let ids: Vec<String> = MaintainerAnalysis.analyze(&ctx).iter().map(|s| s.id.clone()).collect();
         assert!(has(&ids, "B-MAINTAINER-BATCH"));

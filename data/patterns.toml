@@ -180,7 +180,7 @@ override_gate = false
 [[pkgbuild_analysis]]
 id = "P-SUID-BIT"
 pattern = 'chmod\s+(-\S+\s+)*[ugo]*\+s\s|chmod\s+(-\S+\s+)*[2-7][0-7]{3}\s'
-points = 70
+points = 80
 description = "Setting SUID/SGID bit (privilege escalation)"
 override_gate = false
 
@@ -610,6 +610,29 @@ points = 65
 description = "Alias override of common system commands"
 override_gate = false
 
+# NPM payload patterns (common in npm-based PKGBUILD attacks)
+[[pkgbuild_analysis]]
+id = "P-NPM-OBFUSCATED-EXEC"
+pattern = "node\\s+-e\\s+['\"](require|eval|process\\.mainModule)"
+points = 95
+description = "Node.js inline eval/require – potential npm payload"
+override_gate = true
+is_critical = true
+
+[[pkgbuild_analysis]]
+id = "P-NPM-SUSPICIOUS-SCRIPT"
+pattern = '(npm|yarn|npx)\s+(run\s+)?(postinstall|preinstall|install)'
+points = 50
+description = "Running npm lifecycle scripts – possible payload vector"
+override_gate = false
+
+[[pkgbuild_analysis]]
+id = "P-NPM-ATOMIC-LOCKFILE"
+pattern = 'atomic-lockfile'
+points = 60
+description = "References atomic-lockfile (known malicious npm package)"
+override_gate = false
+
 # Install script patterns
 [[install_script_analysis]]
 id = "P-INSTALL-CURL"
@@ -798,6 +821,13 @@ id = "P-INSTALL-XDG-AUTOSTART"
 pattern = '\.config/autostart'
 points = 60
 description = "XDG autostart creation from install script"
+override_gate = false
+
+[[install_script_analysis]]
+id = "P-INSTALL-SUID"
+pattern = 'chmod\s+(-\S+\s+)*[ugo]*\+s\s|chmod\s+(-\S+\s+)*[2-7][0-7]{3}\s'
+points = 80
+description = "Setting SUID/SGID bit in install script (privilege escalation)"
 override_gate = false
 
 # Source URL patterns
@@ -1694,7 +1724,7 @@ override_gate = false
 [[gtfobins_analysis]]
 id = "G-INSTALL-SUID"
 pattern = 'install\s+.*-m\s*[2-7][0-7]{3}\s'
-points = 70
+points = 80
 description = "install with SUID/SGID mode bits"
 override_gate = false
 

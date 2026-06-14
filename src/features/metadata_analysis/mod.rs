@@ -20,6 +20,8 @@ impl Feature for MetadataAnalysis {
                 points: 30,
                 description: "Package has zero votes".to_string(),
                 is_override_gate: false,
+                is_critical: false,
+
                 matched_line: None,
             });
         } else if meta.num_votes < 5 {
@@ -29,6 +31,8 @@ impl Feature for MetadataAnalysis {
                 points: 20,
                 description: format!("Package has very few votes ({})", meta.num_votes),
                 is_override_gate: false,
+                is_critical: false,
+
                 matched_line: None,
             });
         }
@@ -41,6 +45,8 @@ impl Feature for MetadataAnalysis {
                 points: 25,
                 description: "Popularity is 0 (no recent usage)".to_string(),
                 is_override_gate: false,
+                is_critical: false,
+
                 matched_line: None,
             });
         }
@@ -53,6 +59,8 @@ impl Feature for MetadataAnalysis {
                 points: 20,
                 description: "Package is orphaned (no maintainer)".to_string(),
                 is_override_gate: false,
+                is_critical: false,
+
                 matched_line: None,
             });
         }
@@ -65,6 +73,8 @@ impl Feature for MetadataAnalysis {
                 points: 15,
                 description: "No upstream URL provided".to_string(),
                 is_override_gate: false,
+                is_critical: false,
+
                 matched_line: None,
             });
         }
@@ -77,6 +87,8 @@ impl Feature for MetadataAnalysis {
                 points: 10,
                 description: "No license specified".to_string(),
                 is_override_gate: false,
+                is_critical: false,
+
                 matched_line: None,
             });
         }
@@ -89,6 +101,8 @@ impl Feature for MetadataAnalysis {
                 points: 5,
                 description: "Package is flagged as out of date".to_string(),
                 is_override_gate: false,
+                is_critical: false,
+
                 matched_line: None,
             });
         }
@@ -134,6 +148,10 @@ mod tests {
             github_stars: None,
             github_not_found: false,
             aur_comments: vec![],
+                    maintainer_info: None,
+            has_orphan_takeover: false,
+            has_new_malicious_diff: false,
+            npm_info: None,
         };
         MetadataAnalysis.analyze(&ctx).iter().map(|s| s.id.clone()).collect()
     }

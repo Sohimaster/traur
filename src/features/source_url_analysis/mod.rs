@@ -39,6 +39,7 @@ impl Feature for SourceUrlAnalysis {
                     points: pat.points,
                     description: pat.description.clone(),
                     is_override_gate: pat.override_gate,
+                    is_critical: pat.is_critical,
                     matched_line,
                 });
             }
@@ -65,6 +66,10 @@ mod tests {
             github_stars: None,
             github_not_found: false,
             aur_comments: vec![],
+                    maintainer_info: None,
+            has_orphan_takeover: false,
+            has_new_malicious_diff: false,
+            npm_info: None,
         };
         SourceUrlAnalysis.analyze(&ctx).iter().map(|s| s.id.clone()).collect()
     }
@@ -159,6 +164,10 @@ mod tests {
             github_stars: None,
             github_not_found: false,
             aur_comments: vec![],
+                    maintainer_info: None,
+            has_orphan_takeover: false,
+            has_new_malicious_diff: false,
+            npm_info: None,
         };
         let ids: Vec<String> = SourceUrlAnalysis.analyze(&ctx).iter().map(|s| s.id.clone()).collect();
         assert!(!has(&ids, "P-PASTEBIN"), "Should not detect pastebin URL in comment");

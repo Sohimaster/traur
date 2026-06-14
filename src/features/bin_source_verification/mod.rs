@@ -80,6 +80,8 @@ impl Feature for BinSourceVerification {
                                 "-bin package upstream is github.com/{u_org} but source downloads from github.com/{s_org}"
                             ),
                             is_override_gate: false,
+                            is_critical: false,
+
                             matched_line: Some(raw_url.clone()),
                         });
                     }
@@ -88,17 +90,40 @@ impl Feature for BinSourceVerification {
             }
 
             // Domain-level comparison
-            if normalize_domain(&src_domain) != normalize_domain(&upstream_domain) {
-                signals.push(Signal {
-                    id: "B-BIN-DOMAIN-MISMATCH".to_string(),
-                    category: SignalCategory::Behavioral,
-                    points: 30,
-                    description: format!(
-                        "-bin package upstream is {upstream_domain} but source downloads from {src_domain}"
-                    ),
-                    is_override_gate: false,
-                    matched_line: Some(raw_url.clone()),
-                });
+            let src_normalized = normalize_domain(&src_domain);
+            let up_normalized = normalize_domain(&upstream_domain);
+
+            if src_normalized != up_normalized {
+                // Check if one is a subdomain of the other (CDN pattern)
+                if is_subdomain_of(&src_normalized, &up_normalized)
+                    || is_subdomain_of(&up_normalized, &src_normalized)
+                {
+                    signals.push(Signal {
+                        id: "B-BIN-SUBDOMAIN-MISMATCH".to_string(),
+                        category: SignalCategory::Behavioral,
+                        points: 10,
+                        description: format!(
+                            "-bin package upstream is {upstream_domain} but source downloads from CDN subdomain {src_domain}"
+                        ),
+                        is_override_gate: false,
+                        is_critical: false,
+
+                        matched_line: Some(raw_url.clone()),
+                    });
+                } else {
+                    signals.push(Signal {
+                        id: "B-BIN-DOMAIN-MISMATCH".to_string(),
+                        category: SignalCategory::Behavioral,
+                        points: 50,
+                        description: format!(
+                            "-bin package upstream is {upstream_domain} but source downloads from {src_domain}"
+                        ),
+                        is_override_gate: false,
+                        is_critical: false,
+
+                        matched_line: Some(raw_url.clone()),
+                    });
+                }
             }
         }
 
@@ -183,6 +208,15 @@ fn normalize_domain(domain: &str) -> String {
     d
 }
 
+/// Check if `a` is a subdomain of `b` (e.g. "lf-cdn.trae.ai" is subdomain of "trae.ai").
+fn is_subdomain_of(a: &str, b: &str) -> bool {
+    if a == b {
+        return false;
+    }
+    // a must end with ".b" (e.g., "cdn.example.com" ends with ".example.com")
+    a.ends_with(&format!(".{b}"))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -216,6 +250,10 @@ mod tests {
             github_stars: None,
             github_not_found: false,
             aur_comments: vec![],
+                    maintainer_info: None,
+            has_orphan_takeover: false,
+            has_new_malicious_diff: false,
+            npm_info: None,
         };
         BinSourceVerification.analyze(&ctx)
     }
@@ -405,5 +443,41 @@ mod tests {
             .filter(|s| s.id == "B-BIN-GITHUB-ORG-MISMATCH")
             .collect();
         assert_eq!(org_signals.len(), 1);
+    }
+
+    #[test]
+    fn cdn_subdomain_weaker_signal() {
+        let signals = analyze(
+            "tool-bin",
+            Some("https://trae.ai/download"),
+            "source=('https://lf-cdn.trae.ai/releases/tool-v1.0.tar.gz')",
+        );
+        let ids = ids(&signals);
+        assert!(
+            has(&ids, "B-BIN-SUBDOMAIN-MISMATCH"),
+            "CDN subdomain should emit B-BIN-SUBDOMAIN-MISMATCH, got: {ids:?}"
+        );
+        assert!(
+            !has(&ids, "B-BIN-DOMAIN-MISMATCH"),
+            "CDN subdomain should NOT emit B-BIN-DOMAIN-MISMATCH, got: {ids:?}"
+        );
+    }
+
+    #[test]
+    fn completely_different_domain_still_mismatch() {
+        let signals = analyze(
+            "tool-bin",
+            Some("https://trae.ai/download"),
+            "source=('https://github.com/attacker/tool-bin/releases/v1.0.tar.gz')",
+        );
+        let ids = ids(&signals);
+        assert!(
+            has(&ids, "B-BIN-DOMAIN-MISMATCH"),
+            "Completely different domain should still emit B-BIN-DOMAIN-MISMATCH, got: {ids:?}"
+        );
+        assert!(
+            !has(&ids, "B-BIN-SUBDOMAIN-MISMATCH"),
+            "Should not emit subdomain signal for different domain, got: {ids:?}"
+        );
     }
 }

@@ -36,6 +36,8 @@ impl Feature for GitHistoryAnalysis {
                 points: 20,
                 description: "Git history has only 1 commit".to_string(),
                 is_override_gate: false,
+                is_critical: false,
+
                 matched_line: None,
             });
         }
@@ -58,6 +60,8 @@ impl Feature for GitHistoryAnalysis {
                         points: 25,
                         description: format!("Package is very new ({age_days} days old)"),
                         is_override_gate: false,
+                        is_critical: false,
+
                         matched_line: None,
                     });
                 }
@@ -83,6 +87,8 @@ impl Feature for GitHistoryAnalysis {
                                 "Latest commit introduces network code not present in prior history"
                                     .to_string(),
                             is_override_gate: false,
+                            is_critical: false,
+
                             matched_line: None,
                         });
                     }
@@ -101,6 +107,8 @@ impl Feature for GitHistoryAnalysis {
                     points: 25,
                     description: "Git history shows multiple different authors".to_string(),
                     is_override_gate: false,
+                    is_critical: false,
+
                     matched_line: None,
                 });
             }
@@ -141,6 +149,10 @@ mod tests {
             github_stars: None,
             github_not_found: false,
             aur_comments: vec![],
+                    maintainer_info: None,
+            has_orphan_takeover: false,
+            has_new_malicious_diff: false,
+            npm_info: None,
         };
         let ids: Vec<String> = GitHistoryAnalysis.analyze(&ctx).iter().map(|s| s.id.clone()).collect();
         assert!(has(&ids, "T-SINGLE-COMMIT"));
@@ -163,6 +175,10 @@ mod tests {
             github_stars: None,
             github_not_found: false,
             aur_comments: vec![],
+                    maintainer_info: None,
+            has_orphan_takeover: false,
+            has_new_malicious_diff: false,
+            npm_info: None,
         };
         let ids: Vec<String> = GitHistoryAnalysis.analyze(&ctx).iter().map(|s| s.id.clone()).collect();
         assert!(has(&ids, "T-MALICIOUS-DIFF"));
@@ -185,6 +201,10 @@ mod tests {
             github_stars: None,
             github_not_found: false,
             aur_comments: vec![],
+                    maintainer_info: None,
+            has_orphan_takeover: false,
+            has_new_malicious_diff: false,
+            npm_info: None,
         };
         let ids: Vec<String> = GitHistoryAnalysis.analyze(&ctx).iter().map(|s| s.id.clone()).collect();
         assert!(has(&ids, "T-AUTHOR-CHANGE"));
@@ -207,6 +227,10 @@ mod tests {
             github_stars: None,
             github_not_found: false,
             aur_comments: vec![],
+                    maintainer_info: None,
+            has_orphan_takeover: false,
+            has_new_malicious_diff: false,
+            npm_info: None,
         };
         let ids: Vec<String> = GitHistoryAnalysis.analyze(&ctx).iter().map(|s| s.id.clone()).collect();
         assert!(!has(&ids, "T-MALICIOUS-DIFF"), "Should not flag when prior PKGBUILD already had network code");

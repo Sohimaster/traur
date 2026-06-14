@@ -15,10 +15,10 @@ struct Cli {
 
 #[derive(Subcommand)]
 enum Commands {
-    /// Scan a package (or all installed AUR packages if none specified)
+    /// Scan one or more packages (or all installed AUR packages if none specified)
     Scan {
-        /// Package name to scan (or --pkgbuild for local)
-        package: Option<String>,
+        /// Package name(s) to scan (or --pkgbuild for local)
+        package: Vec<String>,
 
         /// Scan a local PKGBUILD directory
         #[arg(long)]
@@ -109,7 +109,7 @@ fn main() {
 }
 
 fn cmd_scan(
-    package: Option<String>,
+    packages: Vec<String>,
     pkgbuild: Option<String>,
     _all_installed: bool,
     jobs: usize,
@@ -139,12 +139,27 @@ fn cmd_scan(
         return if result.tier >= shared::scoring::Tier::Suspicious { 1 } else { 0 };
     }
 
-    if let Some(pkg) = package {
-        return cmd_scan_single(&pkg, json, verbose);
+    if !packages.is_empty() {
+        return cmd_scan_multi(&packages, json, verbose);
     }
 
     // No package, no pkgbuild -> scan all installed AUR packages
     cmd_scan_all_installed(jobs, json, verbose, flagged_only)
+}
+
+fn cmd_scan_multi(packages: &[String], json: bool, verbose: bool) -> i32 {
+    let mut has_error = false;
+
+    for (i, pkg) in packages.iter().enumerate() {
+        if i > 0 && !json {
+            println!();
+        }
+        if cmd_scan_single(pkg, json, verbose) != 0 {
+            has_error = true;
+        }
+    }
+
+    if has_error { 1 } else { 0 }
 }
 
 fn cmd_scan_single(pkg: &str, json: bool, verbose: bool) -> i32 {

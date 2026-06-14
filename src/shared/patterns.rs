@@ -11,6 +11,8 @@ pub struct PatternRule {
     pub description: String,
     #[serde(default)]
     pub override_gate: bool,
+    #[serde(default)]
+    pub is_critical: bool,
 }
 
 /// Collection of pattern rules keyed by feature name.
@@ -27,6 +29,7 @@ pub struct CompiledPattern {
     pub points: u32,
     pub description: String,
     pub override_gate: bool,
+    pub is_critical: bool,
 }
 
 /// Load and compile patterns for a given section from the database.
@@ -49,7 +52,17 @@ pub fn load_patterns(section: &str) -> Vec<CompiledPattern> {
                 points: rule.points,
                 description: rule.description.clone(),
                 override_gate: rule.override_gate,
+                is_critical: rule.is_critical,
             })
         })
+        .collect()
+}
+
+/// Load high-severity patterns (points >= 60) from pkgbuild_analysis for diff detection.
+/// Intended for coordinator use when computing has_new_malicious_diff.
+pub fn load_high_severity_diff_patterns() -> Vec<CompiledPattern> {
+    load_patterns("pkgbuild_analysis")
+        .into_iter()
+        .filter(|p| p.points >= 60)
         .collect()
 }

@@ -131,6 +131,8 @@ impl Feature for NameAnalysis {
                             "Name '{name}' looks like impersonation of '{brand}' with suspicious suffix"
                         ),
                         is_override_gate: false,
+                        is_critical: false,
+
                         matched_line: None,
                     });
                     // Only fire once per package
@@ -154,6 +156,8 @@ impl Feature for NameAnalysis {
                         "Name '{name}' is {dist} edit(s) away from popular package '{top}'"
                     ),
                     is_override_gate: false,
+                    is_critical: false,
+
                     matched_line: None,
                 });
                 break;
@@ -176,6 +180,8 @@ impl Feature for NameAnalysis {
                         "Name '{name}' embeds popular package '{top}'"
                     ),
                     is_override_gate: false,
+                    is_critical: false,
+
                     matched_line: None,
                 });
                 break;
@@ -202,6 +208,10 @@ mod tests {
             github_stars: None,
             github_not_found: false,
             aur_comments: vec![],
+                    maintainer_info: None,
+            has_orphan_takeover: false,
+            has_new_malicious_diff: false,
+            npm_info: None,
         };
         NameAnalysis.analyze(&ctx).iter().map(|s| s.id.clone()).collect()
     }
@@ -231,6 +241,10 @@ mod tests {
             github_stars: None,
             github_not_found: false,
             aur_comments: vec![],
+                    maintainer_info: None,
+            has_orphan_takeover: false,
+            has_new_malicious_diff: false,
+            npm_info: None,
         };
         NameAnalysis.analyze(&ctx).iter().map(|s| s.id.clone()).collect()
     }

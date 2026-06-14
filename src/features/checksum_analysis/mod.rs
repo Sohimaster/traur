@@ -50,6 +50,8 @@ impl Feature for ChecksumAnalysis {
                 points: 30,
                 description: "No checksum array found in PKGBUILD".to_string(),
                 is_override_gate: false,
+                is_critical: false,
+
                 matched_line: None,
             });
         }
@@ -62,6 +64,8 @@ impl Feature for ChecksumAnalysis {
                 points: 25,
                 description: "All checksums are SKIP (no integrity verification)".to_string(),
                 is_override_gate: false,
+                is_critical: false,
+
                 matched_line: None,
             });
         }
@@ -75,6 +79,8 @@ impl Feature for ChecksumAnalysis {
                 description: "Using weak checksums (md5/sha1) without stronger alternative"
                     .to_string(),
                 is_override_gate: false,
+                is_critical: false,
+
                 matched_line: None,
             });
         }
@@ -96,6 +102,8 @@ impl Feature for ChecksumAnalysis {
                                 "checksum count mismatch: {source_name} has {src_count} entries but {checksum_name} has {cksum_count}"
                             ),
                             is_override_gate: false,
+                            is_critical: false,
+
                             matched_line: None,
                         });
                         break 'outer;
@@ -178,6 +186,10 @@ mod tests {
             github_stars: None,
             github_not_found: false,
             aur_comments: vec![],
+                    maintainer_info: None,
+            has_orphan_takeover: false,
+            has_new_malicious_diff: false,
+            npm_info: None,
         };
         ChecksumAnalysis.analyze(&ctx).iter().map(|s| s.id.clone()).collect()
     }
@@ -238,6 +250,10 @@ mod tests {
             github_stars: None,
             github_not_found: false,
             aur_comments: vec![],
+                    maintainer_info: None,
+            has_orphan_takeover: false,
+            has_new_malicious_diff: false,
+            npm_info: None,
         };
         let signals = ChecksumAnalysis.analyze(&ctx);
         let mismatch = signals.iter().find(|s| s.id == "P-CHECKSUM-MISMATCH").unwrap();
@@ -292,6 +308,10 @@ mod tests {
             github_stars: None,
             github_not_found: false,
             aur_comments: vec![],
+                    maintainer_info: None,
+            has_orphan_takeover: false,
+            has_new_malicious_diff: false,
+            npm_info: None,
         };
         let signals = ChecksumAnalysis.analyze(&ctx);
         let mismatch_count = signals.iter().filter(|s| s.id == "P-CHECKSUM-MISMATCH").count();

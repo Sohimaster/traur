@@ -34,6 +34,8 @@ impl Feature for OrphanTakeoverAnalysis {
                 "Package maintainer ({maintainer}) differs from original submitter ({submitter})"
             ),
             is_override_gate: false,
+            is_critical: false,
+
             matched_line: None,
         });
 
@@ -55,6 +57,8 @@ impl Feature for OrphanTakeoverAnalysis {
                         "Adopted package with new git author ({latest_author}) — orphan takeover pattern"
                     ),
                     is_override_gate: false,
+                    is_critical: false,
+
                     matched_line: None,
                 });
             }
@@ -133,6 +137,10 @@ mod tests {
             github_stars: None,
             github_not_found: false,
             aur_comments: vec![],
+                    maintainer_info: None,
+            has_orphan_takeover: false,
+            has_new_malicious_diff: false,
+            npm_info: None,
         };
         assert!(signal_ids(&ctx).is_empty());
     }
@@ -151,6 +159,10 @@ mod tests {
             github_stars: None,
             github_not_found: false,
             aur_comments: vec![],
+                    maintainer_info: None,
+            has_orphan_takeover: false,
+            has_new_malicious_diff: false,
+            npm_info: None,
         };
         assert!(signal_ids(&ctx).is_empty());
     }
@@ -169,6 +181,10 @@ mod tests {
             github_stars: None,
             github_not_found: false,
             aur_comments: vec![],
+                    maintainer_info: None,
+            has_orphan_takeover: false,
+            has_new_malicious_diff: false,
+            npm_info: None,
         };
         let ids = signal_ids(&ctx);
         assert!(has(&ids, "B-SUBMITTER-CHANGED"));
@@ -192,6 +208,10 @@ mod tests {
             github_stars: None,
             github_not_found: false,
             aur_comments: vec![],
+                    maintainer_info: None,
+            has_orphan_takeover: false,
+            has_new_malicious_diff: false,
+            npm_info: None,
         };
         let ids = signal_ids(&ctx);
         assert!(has(&ids, "B-SUBMITTER-CHANGED"));
@@ -215,6 +235,10 @@ mod tests {
             github_stars: None,
             github_not_found: false,
             aur_comments: vec![],
+                    maintainer_info: None,
+            has_orphan_takeover: false,
+            has_new_malicious_diff: false,
+            npm_info: None,
         };
         let ids = signal_ids(&ctx);
         assert!(has(&ids, "B-SUBMITTER-CHANGED"));
@@ -238,6 +262,10 @@ mod tests {
             github_stars: None,
             github_not_found: false,
             aur_comments: vec![],
+                    maintainer_info: None,
+            has_orphan_takeover: false,
+            has_new_malicious_diff: false,
+            npm_info: None,
         };
         let ids = signal_ids(&ctx);
         assert!(has(&ids, "B-SUBMITTER-CHANGED"));

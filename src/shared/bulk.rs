@@ -66,7 +66,7 @@ pub fn clone_with_retry(
         match coordinator::build_context_prefetched(name, metadata.clone(), maintainer_packages.clone())
         {
             Ok(ctx) => return Ok(ctx),
-            Err(e) if attempt + 1 < MAX_RETRIES => {
+            Err(_e) if attempt + 1 < MAX_RETRIES => {
                 let delay = RETRY_BASE_DELAY * 2u32.pow(attempt);
                 std::thread::sleep(delay);
                 continue;

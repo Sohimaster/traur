@@ -27,6 +27,7 @@ impl Feature for InstallScriptAnalysis {
                     points: pat.points,
                     description: pat.description.clone(),
                     is_override_gate: pat.override_gate,
+                    is_critical: pat.is_critical,
                     matched_line,
                 });
             }
@@ -52,6 +53,10 @@ mod tests {
             github_stars: None,
             github_not_found: false,
             aur_comments: vec![],
+                    maintainer_info: None,
+            has_orphan_takeover: false,
+            has_new_malicious_diff: false,
+            npm_info: None,
         };
         InstallScriptAnalysis.analyze(&ctx).iter().map(|s| s.id.clone()).collect()
     }
@@ -248,6 +253,36 @@ mod tests {
     fn install_tmp_exec_intervening_flags() {
         let ids = analyze("chmod -v +x /tmp/payload");
         assert!(has(&ids, "P-INSTALL-TMP-EXEC"));
+    }
+
+    #[test]
+    fn install_suid_bit() {
+        let ids = analyze("chmod 4755 /opt/obsidian/chrome-sandbox");
+        assert!(has(&ids, "P-INSTALL-SUID"), "chmod 4755 in install script should be detected");
+    }
+
+    #[test]
+    fn install_suid_bit_symbolic() {
+        let ids = analyze("chmod +s /usr/bin/evil");
+        assert!(has(&ids, "P-INSTALL-SUID"), "chmod +s in install script should be detected");
+    }
+
+    #[test]
+    fn install_suid_bit_sgid() {
+        let ids = analyze("chmod 2755 /usr/bin/tool");
+        assert!(has(&ids, "P-INSTALL-SUID"), "chmod 2755 (SGID) in install script should be detected");
+    }
+
+    #[test]
+    fn install_suid_bit_intervening_flags() {
+        let ids = analyze("chmod -v 4755 /opt/tool/chrome-sandbox");
+        assert!(has(&ids, "P-INSTALL-SUID"), "chmod -v 4755 in install script should be detected");
+    }
+
+    #[test]
+    fn install_no_suid_for_regular_chmod() {
+        let ids = analyze("chmod 755 /usr/bin/tool");
+        assert!(!has(&ids, "P-INSTALL-SUID"), "chmod 755 should not trigger SUID in install script");
     }
 
     #[test]

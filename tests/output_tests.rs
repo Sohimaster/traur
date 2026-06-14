@@ -13,6 +13,7 @@ fn make_signal(id: &str, category: SignalCategory, points: u32, description: &st
         points,
         description: description.to_string(),
         is_override_gate: override_gate,
+        is_critical: false,
         matched_line: None,
     }
 }
@@ -24,6 +25,7 @@ fn make_signal_with_line(id: &str, category: SignalCategory, points: u32, descri
         points,
         description: description.to_string(),
         is_override_gate: override_gate,
+        is_critical: false,
         matched_line: Some(line.to_string()),
     }
 }

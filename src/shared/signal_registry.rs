@@ -10,6 +10,8 @@ pub struct SignalDef {
     pub description: String,
     #[allow(dead_code)]
     pub is_override_gate: bool,
+    #[allow(dead_code)]
+    pub is_critical: bool,
 }
 
 /// Return all known signal definitions (pattern-based + hardcoded).
@@ -39,6 +41,7 @@ fn pattern_signals() -> Vec<SignalDef> {
                 points: rule.points,
                 description: rule.description.clone(),
                 is_override_gate: rule.override_gate,
+                is_critical: rule.is_critical,
             });
         }
     }
@@ -49,67 +52,73 @@ fn pattern_signals() -> Vec<SignalDef> {
 /// Keep in sync when adding/changing signals in feature analyze() methods.
 fn hardcoded_signals() -> Vec<SignalDef> {
     use SignalCategory::*;
-    let defs: Vec<(&str, SignalCategory, u32, &str, bool)> = vec![
+    let defs: Vec<(&str, SignalCategory, u32, &str, bool, bool)> = vec![
         // metadata_analysis
-        ("M-VOTES-ZERO", Metadata, 30, "Package has zero votes", false),
-        ("M-VOTES-LOW", Metadata, 20, "Package has very few votes", false),
-        ("M-POP-ZERO", Metadata, 25, "Popularity is 0 (no recent usage)", false),
-        ("M-NO-MAINTAINER", Metadata, 20, "Package is orphaned (no maintainer)", false),
-        ("M-NO-URL", Metadata, 15, "No upstream URL provided", false),
-        ("M-NO-LICENSE", Metadata, 10, "No license specified", false),
-        ("M-OUT-OF-DATE", Metadata, 5, "Package is flagged as out of date", false),
+        ("M-VOTES-ZERO", Metadata, 30, "Package has zero votes", false, false),
+        ("M-VOTES-LOW", Metadata, 20, "Package has very few votes", false, false),
+        ("M-POP-ZERO", Metadata, 25, "Popularity is 0 (no recent usage)", false, false),
+        ("M-NO-MAINTAINER", Metadata, 20, "Package is orphaned (no maintainer)", false, false),
+        ("M-NO-URL", Metadata, 15, "No upstream URL provided", false, false),
+        ("M-NO-LICENSE", Metadata, 10, "No license specified", false, false),
+        ("M-OUT-OF-DATE", Metadata, 5, "Package is flagged as out of date", false, false),
         // name_analysis
-        ("B-NAME-IMPERSONATE", Behavioral, 65, "Name looks like impersonation of a popular package", false),
-        ("B-TYPOSQUAT", Behavioral, 55, "Name is suspiciously similar to a popular package", false),
+        ("B-NAME-IMPERSONATE", Behavioral, 65, "Name looks like impersonation of a popular package", false, false),
+        ("B-TYPOSQUAT", Behavioral, 55, "Name is suspiciously similar to a popular package", false, false),
         // maintainer_analysis
-        ("B-MAINTAINER-NEW", Behavioral, 30, "Maintainer has only 1 package, created recently", false),
-        ("B-MAINTAINER-SINGLE", Behavioral, 15, "Maintainer has only 1 package", false),
-        ("B-MAINTAINER-BATCH", Behavioral, 45, "Maintainer created 3+ packages in the last 48 hours", false),
+        ("B-MAINTAINER-NEW", Behavioral, 30, "Maintainer has only 1 package, created recently", false, false),
+        ("B-MAINTAINER-SINGLE", Behavioral, 15, "Maintainer has only 1 package", false, false),
+        ("B-MAINTAINER-BATCH", Behavioral, 45, "Maintainer created 3+ packages in the last 48 hours", false, false),
         // orphan_takeover_analysis
-        ("B-SUBMITTER-CHANGED", Behavioral, 15, "Package maintainer differs from original submitter", false),
-        ("B-ORPHAN-TAKEOVER", Behavioral, 50, "Adopted package with new git author (orphan takeover pattern)", false),
+        ("B-SUBMITTER-CHANGED", Behavioral, 15, "Package maintainer differs from original submitter", false, false),
+        ("B-ORPHAN-TAKEOVER", Behavioral, 50, "Adopted package with new git author (orphan takeover pattern)", false, false),
         // bin_source_verification
-        ("B-BIN-GITHUB-ORG-MISMATCH", Behavioral, 50, "-bin package source downloads from different GitHub org than upstream", false),
-        ("B-BIN-DOMAIN-MISMATCH", Behavioral, 30, "-bin package source downloads from different domain than upstream", false),
+        ("B-BIN-GITHUB-ORG-MISMATCH", Behavioral, 50, "-bin package source downloads from different GitHub org than upstream", false, false),
+        ("B-BIN-DOMAIN-MISMATCH", Behavioral, 50, "-bin package source downloads from different domain than upstream", false, false),
+        ("B-BIN-SUBDOMAIN-MISMATCH", Behavioral, 10, "-bin package source downloads from CDN subdomain of upstream", false, false),
         // git_history_analysis
-        ("T-SINGLE-COMMIT", Temporal, 20, "Git history has only 1 commit", false),
-        ("T-NEW-PACKAGE", Temporal, 25, "Package is very new (< 7 days old)", false),
-        ("T-MALICIOUS-DIFF", Temporal, 55, "Latest commit introduces network code not present in prior history", false),
-        ("T-AUTHOR-CHANGE", Temporal, 25, "Git history shows multiple different authors", false),
+        ("T-SINGLE-COMMIT", Temporal, 20, "Git history has only 1 commit", false, false),
+        ("T-NEW-PACKAGE", Temporal, 25, "Package is very new (< 7 days old)", false, false),
+        ("T-MALICIOUS-DIFF", Temporal, 55, "Latest commit introduces network code not present in prior history", false, false),
+        ("T-AUTHOR-CHANGE", Temporal, 25, "Git history shows multiple different authors", false, false),
         // aur_comments_analysis
-        ("M-COMMENTS-SECURITY", Metadata, 40, "Recent AUR comments contain security-related warnings", false),
+        ("M-COMMENTS-SECURITY", Metadata, 40, "Recent AUR comments contain security-related warnings", true, false),
         // github_stars
-        ("M-GITHUB-STARS-ZERO", Metadata, 20, "Upstream GitHub repo has 0 stars", false),
-        ("M-GITHUB-STARS-LOW", Metadata, 10, "Upstream GitHub repo has very few stars (<10)", false),
-        ("M-GITHUB-NOT-FOUND", Metadata, 25, "Upstream URL points to GitHub but repo does not exist", false),
+        ("M-GITHUB-STARS-ZERO", Metadata, 20, "Upstream GitHub repo has 0 stars", false, false),
+        ("M-GITHUB-STARS-LOW", Metadata, 10, "Upstream GitHub repo has very few stars (<10)", false, false),
+        ("M-GITHUB-NOT-FOUND", Metadata, 25, "Upstream URL points to GitHub but repo does not exist", false, false),
         // pkgbuild_diff_analysis
-        ("T-DIFF-NEW-SUSPICIOUS", Temporal, 40, "Newly introduced suspicious pattern not in prior version", false),
-        ("T-DIFF-CHECKSUM-REMOVED", Temporal, 35, "Checksum array removed or all entries changed to SKIP", false),
-        ("T-DIFF-SOURCE-DOMAIN-CHANGED", Temporal, 30, "Source URLs changed to a different domain", false),
-        ("T-DIFF-MAJOR-REWRITE", Temporal, 15, ">50% of PKGBUILD lines changed (unusual for version bump)", false),
+        ("T-DIFF-NEW-SUSPICIOUS", Temporal, 40, "Newly introduced suspicious pattern not in prior version", false, false),
+        ("T-DIFF-CHECKSUM-REMOVED", Temporal, 35, "Checksum array removed or all entries changed to SKIP", false, false),
+        ("T-DIFF-SOURCE-DOMAIN-CHANGED", Temporal, 30, "Source URLs changed to a different domain", false, false),
+        ("T-DIFF-MAJOR-REWRITE", Temporal, 15, ">50% of PKGBUILD lines changed (unusual for version bump)", false, false),
         // checksum_analysis
-        ("P-NO-CHECKSUMS", Pkgbuild, 30, "No checksum array found in PKGBUILD", false),
-        ("P-SKIP-ALL", Pkgbuild, 25, "All checksums are SKIP (no integrity verification)", false),
-        ("P-WEAK-CHECKSUMS", Pkgbuild, 10, "Using weak checksums (md5/sha1) without stronger alternative", false),
-        ("P-CHECKSUM-MISMATCH", Pkgbuild, 25, "Source count != checksum count", false),
+        ("P-NO-CHECKSUMS", Pkgbuild, 30, "No checksum array found in PKGBUILD", false, false),
+        ("P-SKIP-ALL", Pkgbuild, 70, "All checksums are SKIP (no integrity verification)", false, false),
+        ("P-WEAK-CHECKSUMS", Pkgbuild, 10, "Using weak checksums (md5/sha1) without stronger alternative", false, false),
+        ("P-CHECKSUM-MISMATCH", Pkgbuild, 25, "Source count != checksum count", false, false),
         // shell_analysis
-        ("SA-VAR-CONCAT-EXEC", Pkgbuild, 85, "Variable concatenation resolves to download-and-execute", true),
-        ("SA-VAR-CONCAT-CMD", Pkgbuild, 55, "Variable concatenation resolves to dangerous command", false),
-        ("SA-INDIRECT-EXEC", Pkgbuild, 70, "Variable with dangerous command in execution position", false),
-        ("SA-CHARBYCHAR-CONSTRUCT", Pkgbuild, 75, "Printf/echo subshell char-by-char command construction", false),
-        ("SA-DATA-BLOB-HEX", Pkgbuild, 50, "Embedded long hex string (possible encoded payload)", false),
-        ("SA-DATA-BLOB-BASE64", Pkgbuild, 50, "Embedded long base64 string (possible encoded payload)", false),
-        ("SA-HIGH-ENTROPY-HEREDOC", Pkgbuild, 55, "Heredoc with high entropy content", false),
-        ("SA-BINARY-DOWNLOAD-NOCOMPILE", Pkgbuild, 60, "Downloads file and chmod +x with no compilation step", false),
+        ("SA-VAR-CONCAT-EXEC", Pkgbuild, 85, "Variable concatenation resolves to download-and-execute", true, false),
+        ("SA-VAR-CONCAT-CMD", Pkgbuild, 55, "Variable concatenation resolves to dangerous command", false, false),
+        ("SA-INDIRECT-EXEC", Pkgbuild, 70, "Variable with dangerous command in execution position", false, false),
+        ("SA-CHARBYCHAR-CONSTRUCT", Pkgbuild, 75, "Printf/echo subshell char-by-char command construction", false, false),
+        ("SA-DATA-BLOB-HEX", Pkgbuild, 50, "Embedded long hex string (possible encoded payload)", false, false),
+        ("SA-DATA-BLOB-BASE64", Pkgbuild, 50, "Embedded long base64 string (possible encoded payload)", false, false),
+        ("SA-HIGH-ENTROPY-HEREDOC", Pkgbuild, 55, "Heredoc with high entropy content", false, false),
+        ("SA-BINARY-DOWNLOAD-NOCOMPILE", Pkgbuild, 60, "Downloads file and chmod +x with no compilation step", false, false),
+        // install_script_analysis (hardcoded)
+        ("P-INSTALL-SUID", Pkgbuild, 55, "Setting SUID/SGID bit in install script (privilege escalation)", false, false),
+        // NPM legitimacy check
+        ("N-NPM-LEGITIMACY-CHECKED", Pkgbuild, 0, "NPM package legitimacy verified by deep analysis", false, false),
     ];
 
     defs.into_iter()
-        .map(|(id, cat, pts, desc, gate)| SignalDef {
+        .map(|(id, cat, pts, desc, gate, critical)| SignalDef {
             id: id.to_string(),
             category: cat,
             points: pts,
             description: desc.to_string(),
             is_override_gate: gate,
+            is_critical: critical,
         })
         .collect()
 }
