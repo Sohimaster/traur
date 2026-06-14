@@ -14,6 +14,25 @@ pub fn git_cache_dir() -> PathBuf {
     dir
 }
 
+pub fn clean_git_cache(package: Option<&str>) -> std::io::Result<()> {
+    let git_dir = git_cache_dir();
+    match package {
+        Some(pkg) => {
+            let repo_path = git_dir.join(pkg);
+            if repo_path.exists() {
+                std::fs::remove_dir_all(&repo_path)?;
+            }
+        }
+        None => {
+            if git_dir.exists() {
+                std::fs::remove_dir_all(&git_dir)?;
+                std::fs::create_dir_all(&git_dir)?;
+            }
+        }
+    }
+    Ok(())
+}
+
 fn dirs_or_default() -> PathBuf {
     if let Ok(xdg) = std::env::var("XDG_CACHE_HOME") {
         PathBuf::from(xdg).join("traur")

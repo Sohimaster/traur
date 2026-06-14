@@ -42,6 +42,7 @@ mod tests {
 
     fn analyze(content: &str) -> Vec<String> {
         let ctx = PackageContext {
+            package_base: None,
             name: "test-pkg".into(),
             metadata: None,
             pkgbuild_content: Some(content.into()),

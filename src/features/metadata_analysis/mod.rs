@@ -124,6 +124,7 @@ mod tests {
 
     fn analyze_meta(meta: AurPackage) -> Vec<String> {
         let ctx = PackageContext {
+            package_base: None,
             name: "test-pkg".into(),
             metadata: Some(meta),
             pkgbuild_content: None,
