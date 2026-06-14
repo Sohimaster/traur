@@ -66,6 +66,7 @@ mod tests {
 
     fn analyze_comments(comments: Vec<&str>) -> Vec<String> {
         let ctx = PackageContext {
+            package_base: None,
             name: "test".into(),
             metadata: None,
             pkgbuild_content: None,

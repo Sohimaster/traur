@@ -83,6 +83,11 @@ enum Commands {
         #[arg(long)]
         category: Option<String>,
     },
+    /// Remove cached git clones (all packages, or a specific one)
+    Clean {
+        /// Package name to remove from cache (omit to clear entire cache)
+        package: Option<String>,
+    },
 }
 
 fn main() {
@@ -103,6 +108,7 @@ fn main() {
         Commands::Signals { json } => cmd_signals(json),
         Commands::Ignore { signal_id, category } => cmd_ignore(signal_id.as_deref(), category.as_deref()),
         Commands::Unignore { signal_id, category } => cmd_unignore(signal_id.as_deref(), category.as_deref()),
+        Commands::Clean { package } => cmd_clean(package.as_deref()),
     };
 
     process::exit(exit_code);
@@ -232,7 +238,12 @@ fn cmd_scan_all_installed(jobs: usize, json: bool, verbose: bool, flagged_only: 
                     .unwrap_or_default();
 
                 match clone_with_retry(name, meta, maint_pkgs) {
-                    Ok(ctx) => Ok(coordinator::run_analysis_with_config(&ctx, &config)),
+                    Ok(ctx) => {
+                        let scan = coordinator::run_analysis_with_config(&ctx, &config);
+                        let pkg_base = ctx.package_base.as_deref().unwrap_or(name);
+                        let _ = shared::cache::clean_git_cache(Some(pkg_base));
+                        Ok(scan)
+                    }
                     Err(e) => Err(e),
                 }
             } else {
@@ -501,6 +512,23 @@ fn cmd_unignore(signal_id: Option<&str>, category: Option<&str>) -> i32 {
         }
         _ => {
             eprintln!("Provide either a signal ID or --category, not both.");
+            1
+        }
+    }
+}
+
+fn cmd_clean(package: Option<&str>) -> i32 {
+    match shared::cache::clean_git_cache(package) {
+        Ok(()) => {
+            if let Some(pkg) = package {
+                eprintln!("Cleaned cache for: {pkg}");
+            } else {
+                eprintln!("Cleaned all cached AUR git repos");
+            }
+            0
+        }
+        Err(e) => {
+            eprintln!("Error cleaning cache: {e}");
             1
         }
     }

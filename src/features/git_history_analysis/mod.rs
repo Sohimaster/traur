@@ -131,6 +131,7 @@ mod tests {
     fn single_commit() {
         let ts = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_secs();
         let ctx = PackageContext {
+            package_base: None,
             name: "test".into(),
             metadata: None,
             pkgbuild_content: None,
@@ -150,6 +151,7 @@ mod tests {
     fn malicious_diff() {
         let ts = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_secs();
         let ctx = PackageContext {
+            package_base: None,
             name: "test".into(),
             metadata: None,
             pkgbuild_content: None,
@@ -172,6 +174,7 @@ mod tests {
     fn author_change() {
         let ts = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_secs();
         let ctx = PackageContext {
+            package_base: None,
             name: "test".into(),
             metadata: None,
             pkgbuild_content: None,
@@ -194,6 +197,7 @@ mod tests {
     fn no_diff_introduced_when_prior_has_net() {
         let ts = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_secs();
         let ctx = PackageContext {
+            package_base: None,
             name: "test".into(),
             metadata: None,
             pkgbuild_content: None,
