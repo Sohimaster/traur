@@ -1,6 +1,6 @@
 use crate::features::Feature;
 use crate::shared::models::PackageContext;
-use crate::shared::scoring::{Signal, SignalCategory};
+use crate::shared::scoring::{Signal, SignalCategory, SignalRole};
 use std::collections::HashSet;
 
 pub struct OrphanTakeoverAnalysis;
@@ -29,6 +29,7 @@ impl Feature for OrphanTakeoverAnalysis {
         signals.push(Signal {
             id: "B-SUBMITTER-CHANGED".to_string(),
             category: SignalCategory::Behavioral,
+            role: SignalRole::Provenance,
             points: 15,
             description: format!(
                 "Package maintainer ({maintainer}) differs from original submitter ({submitter})"
@@ -50,6 +51,7 @@ impl Feature for OrphanTakeoverAnalysis {
                 signals.push(Signal {
                     id: "B-ORPHAN-TAKEOVER".to_string(),
                     category: SignalCategory::Behavioral,
+                    role: SignalRole::Provenance,
                     points: 50,
                     description: format!(
                         "Adopted package with new git author ({latest_author}) — orphan takeover pattern"
@@ -133,6 +135,9 @@ mod tests {
             github_stars: None,
             github_not_found: false,
             aur_comments: vec![],
+            local_sources: vec![],
+            source_path: None,
+            incomplete: vec![],
         };
         assert!(signal_ids(&ctx).is_empty());
     }
@@ -151,6 +156,9 @@ mod tests {
             github_stars: None,
             github_not_found: false,
             aur_comments: vec![],
+            local_sources: vec![],
+            source_path: None,
+            incomplete: vec![],
         };
         assert!(signal_ids(&ctx).is_empty());
     }
@@ -169,6 +177,9 @@ mod tests {
             github_stars: None,
             github_not_found: false,
             aur_comments: vec![],
+            local_sources: vec![],
+            source_path: None,
+            incomplete: vec![],
         };
         let ids = signal_ids(&ctx);
         assert!(has(&ids, "B-SUBMITTER-CHANGED"));
@@ -192,6 +203,9 @@ mod tests {
             github_stars: None,
             github_not_found: false,
             aur_comments: vec![],
+            local_sources: vec![],
+            source_path: None,
+            incomplete: vec![],
         };
         let ids = signal_ids(&ctx);
         assert!(has(&ids, "B-SUBMITTER-CHANGED"));
@@ -215,6 +229,9 @@ mod tests {
             github_stars: None,
             github_not_found: false,
             aur_comments: vec![],
+            local_sources: vec![],
+            source_path: None,
+            incomplete: vec![],
         };
         let ids = signal_ids(&ctx);
         assert!(has(&ids, "B-SUBMITTER-CHANGED"));
@@ -238,6 +255,9 @@ mod tests {
             github_stars: None,
             github_not_found: false,
             aur_comments: vec![],
+            local_sources: vec![],
+            source_path: None,
+            incomplete: vec![],
         };
         let ids = signal_ids(&ctx);
         assert!(has(&ids, "B-SUBMITTER-CHANGED"));

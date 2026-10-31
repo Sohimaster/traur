@@ -61,8 +61,8 @@ override_gate = false
 [[pkgbuild_analysis]]
 id = "P-EVAL-VAR"
 pattern = 'eval\s+["$]'
-points = 50
-description = "Dynamic code execution via eval"
+points = 0
+description = "eval of a dynamic argument (classified by SA-EVAL-*; retained for compatibility)"
 override_gate = false
 
 [[pkgbuild_analysis]]
@@ -1297,9 +1297,9 @@ override_gate = false
 
 [[gtfobins_analysis]]
 id = "G-DOWNLOAD-NODE"
-pattern = 'node\s+.*(-e|--eval)\s.*\bhttp\b.*\bget\b|npm\s+exec\s|npx\s+\S'
+pattern = 'node\s+.*(-e|--eval)\s.*\bhttp\b.*\bget\b|npx\s+(?:--yes\s+)?[a-z@][\w@/.-]*|npm\s+exec\s+--?\s*[a-z@][\w@/.-]*\s+[^\n]*https?://'
 points = 50
-description = "Node.js HTTP download or npx remote execution"
+description = "Node.js HTTP download or npx remote execution (declared pnpm/npm build tools are not matched)"
 override_gate = false
 
 # --- Interpreter Inline Execution (supporting signals) ---

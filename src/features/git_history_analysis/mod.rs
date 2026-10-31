@@ -1,6 +1,6 @@
 use crate::features::Feature;
 use crate::shared::models::PackageContext;
-use crate::shared::scoring::{Signal, SignalCategory};
+use crate::shared::scoring::{Signal, SignalCategory, SignalRole};
 use regex::Regex;
 use std::sync::LazyLock;
 use std::time::{SystemTime, UNIX_EPOCH};
@@ -33,6 +33,7 @@ impl Feature for GitHistoryAnalysis {
             signals.push(Signal {
                 id: "T-SINGLE-COMMIT".to_string(),
                 category: SignalCategory::Temporal,
+                role: SignalRole::Provenance,
                 points: 20,
                 description: "Git history has only 1 commit".to_string(),
                 is_override_gate: false,
@@ -55,6 +56,7 @@ impl Feature for GitHistoryAnalysis {
                     signals.push(Signal {
                         id: "T-NEW-PACKAGE".to_string(),
                         category: SignalCategory::Temporal,
+                        role: SignalRole::Provenance,
                         points: 25,
                         description: format!("Package is very new ({age_days} days old)"),
                         is_override_gate: false,
@@ -78,6 +80,7 @@ impl Feature for GitHistoryAnalysis {
                         signals.push(Signal {
                             id: "T-MALICIOUS-DIFF".to_string(),
                             category: SignalCategory::Temporal,
+                            role: SignalRole::Provenance,
                             points: 55,
                             description:
                                 "Latest commit introduces network code not present in prior history"
@@ -98,6 +101,7 @@ impl Feature for GitHistoryAnalysis {
                 signals.push(Signal {
                     id: "T-AUTHOR-CHANGE".to_string(),
                     category: SignalCategory::Temporal,
+                    role: SignalRole::Provenance,
                     points: 25,
                     description: "Git history shows multiple different authors".to_string(),
                     is_override_gate: false,
@@ -141,6 +145,9 @@ mod tests {
             github_stars: None,
             github_not_found: false,
             aur_comments: vec![],
+            local_sources: vec![],
+            source_path: None,
+            incomplete: vec![],
         };
         let ids: Vec<String> = GitHistoryAnalysis.analyze(&ctx).iter().map(|s| s.id.clone()).collect();
         assert!(has(&ids, "T-SINGLE-COMMIT"));
@@ -163,6 +170,9 @@ mod tests {
             github_stars: None,
             github_not_found: false,
             aur_comments: vec![],
+            local_sources: vec![],
+            source_path: None,
+            incomplete: vec![],
         };
         let ids: Vec<String> = GitHistoryAnalysis.analyze(&ctx).iter().map(|s| s.id.clone()).collect();
         assert!(has(&ids, "T-MALICIOUS-DIFF"));
@@ -185,6 +195,9 @@ mod tests {
             github_stars: None,
             github_not_found: false,
             aur_comments: vec![],
+            local_sources: vec![],
+            source_path: None,
+            incomplete: vec![],
         };
         let ids: Vec<String> = GitHistoryAnalysis.analyze(&ctx).iter().map(|s| s.id.clone()).collect();
         assert!(has(&ids, "T-AUTHOR-CHANGE"));
@@ -207,6 +220,9 @@ mod tests {
             github_stars: None,
             github_not_found: false,
             aur_comments: vec![],
+            local_sources: vec![],
+            source_path: None,
+            incomplete: vec![],
         };
         let ids: Vec<String> = GitHistoryAnalysis.analyze(&ctx).iter().map(|s| s.id.clone()).collect();
         assert!(!has(&ids, "T-MALICIOUS-DIFF"), "Should not flag when prior PKGBUILD already had network code");

@@ -1,6 +1,6 @@
 use crate::features::Feature;
 use crate::shared::models::PackageContext;
-use crate::shared::scoring::{Signal, SignalCategory};
+use crate::shared::scoring::{Signal, SignalCategory, SignalRole};
 use regex::Regex;
 use std::sync::LazyLock;
 
@@ -47,6 +47,7 @@ impl Feature for ChecksumAnalysis {
             signals.push(Signal {
                 id: "P-NO-CHECKSUMS".to_string(),
                 category: SignalCategory::Pkgbuild,
+                role: SignalRole::Fact,
                 points: 30,
                 description: "No checksum array found in PKGBUILD".to_string(),
                 is_override_gate: false,
@@ -59,6 +60,7 @@ impl Feature for ChecksumAnalysis {
             signals.push(Signal {
                 id: "P-SKIP-ALL".to_string(),
                 category: SignalCategory::Pkgbuild,
+                role: SignalRole::Fact,
                 points: 25,
                 description: "All checksums are SKIP (no integrity verification)".to_string(),
                 is_override_gate: false,
@@ -71,6 +73,7 @@ impl Feature for ChecksumAnalysis {
             signals.push(Signal {
                 id: "P-WEAK-CHECKSUMS".to_string(),
                 category: SignalCategory::Pkgbuild,
+                role: SignalRole::Fact,
                 points: 10,
                 description: "Using weak checksums (md5/sha1) without stronger alternative"
                     .to_string(),
@@ -91,6 +94,7 @@ impl Feature for ChecksumAnalysis {
                         signals.push(Signal {
                             id: "P-CHECKSUM-MISMATCH".to_string(),
                             category: SignalCategory::Pkgbuild,
+                            role: SignalRole::Fact,
                             points: 25,
                             description: format!(
                                 "checksum count mismatch: {source_name} has {src_count} entries but {checksum_name} has {cksum_count}"
@@ -150,7 +154,7 @@ static DYNAMIC_BASH_RE: LazyLock<Regex> = LazyLock::new(|| {
 /// Returns 0 for arrays with dynamic bash constructs (command substitution,
 /// array expansion) since static token counting would be unreliable.
 fn count_array_entries(content: &str, array_name: &str) -> usize {
-    let pattern = format!(r"(?ms)^{array_name}=\((.*?)\)");
+    let pattern = format!(r"(?ms)^{array_name}\s*=\s*\((.*?)\)");
     let re = Regex::new(&pattern).unwrap();
     let Some(caps) = re.captures(content) else {
         return 0;
@@ -162,6 +166,50 @@ fn count_array_entries(content: &str, array_name: &str) -> usize {
     count_bash_array_words(body)
 }
 
+/// Strip `#` comments from an array body.
+///
+/// Multi-line arrays are routinely annotated (`'abc…'  # voxtype-baseline`),
+/// and counting those words inflated the entry count: `voxtype-bin` reported
+/// "source has 10 entries but sha256sums has 145" because every comment and
+/// blank line counted as an entry. A `#` only starts a comment at a word
+/// boundary, so `a#b` inside a value is preserved.
+fn strip_array_comments(body: &str) -> String {
+    let mut out = String::with_capacity(body.len());
+    for line in body.lines() {
+        let mut quote: Option<char> = None;
+        // `cut` indexes the char vector below, not the byte string: using
+        // `line.len()` sliced by bytes and panicked on non-ASCII input.
+        let bytes: Vec<char> = line.chars().collect();
+        let mut cut = bytes.len();
+        let mut i = 0;
+        while i < bytes.len() {
+            let c = bytes[i];
+            match quote {
+                Some(q) => {
+                    if c == q {
+                        quote = None;
+                    }
+                }
+                None => {
+                    if c == '\'' || c == '"' {
+                        quote = Some(c);
+                    } else if c == '#' {
+                        let prev = if i == 0 { ' ' } else { bytes[i - 1] };
+                        if prev.is_whitespace() || prev == '(' {
+                            cut = i;
+                            break;
+                        }
+                    }
+                }
+            }
+            i += 1;
+        }
+        out.extend(bytes[..cut].iter());
+        out.push('\n');
+    }
+    out
+}
+
 /// Count the words in a bash array body.
 ///
 /// `TOKEN_RE` alone splits `"name"::"url"` (and `name::url`) into three
@@ -169,6 +217,7 @@ fn count_array_entries(content: &str, array_name: &str) -> usize {
 /// report a bogus count mismatch. An `a::b` spec is a single entry, so
 /// adjacent tokens joined by `::` are merged before counting.
 fn count_bash_array_words(body: &str) -> usize {
+    let body = strip_array_comments(body);
     // A quoted segment, a `::` joiner (its own token when between quotes), or
     // a bare word.
     let joiner = "::";
@@ -176,7 +225,7 @@ fn count_bash_array_words(body: &str) -> usize {
     // Set when the previous token ended a word that the next one continues.
     let mut continuing = false;
 
-    for m in TOKEN_RE.find_iter(body) {
+    for m in TOKEN_RE.find_iter(&body) {
         let token = m.as_str();
 
         if token == joiner {
@@ -219,6 +268,9 @@ mod tests {
             github_stars: None,
             github_not_found: false,
             aur_comments: vec![],
+            local_sources: vec![],
+            source_path: None,
+            incomplete: vec![],
         };
         ChecksumAnalysis.analyze(&ctx).iter().map(|s| s.id.clone()).collect()
     }
@@ -279,6 +331,9 @@ mod tests {
             github_stars: None,
             github_not_found: false,
             aur_comments: vec![],
+            local_sources: vec![],
+            source_path: None,
+            incomplete: vec![],
         };
         let signals = ChecksumAnalysis.analyze(&ctx);
         let mismatch = signals.iter().find(|s| s.id == "P-CHECKSUM-MISMATCH").unwrap();
@@ -333,6 +388,9 @@ mod tests {
             github_stars: None,
             github_not_found: false,
             aur_comments: vec![],
+            local_sources: vec![],
+            source_path: None,
+            incomplete: vec![],
         };
         let signals = ChecksumAnalysis.analyze(&ctx);
         let mismatch_count = signals.iter().filter(|s| s.id == "P-CHECKSUM-MISMATCH").count();
@@ -377,6 +435,9 @@ mod word_count_tests {
             github_stars: None,
             github_not_found: false,
             aur_comments: vec![],
+            local_sources: vec![],
+            source_path: None,
+            incomplete: vec![],
         };
         let ids: Vec<String> = ChecksumAnalysis.analyze(&ctx).iter().map(|s| s.id.clone()).collect();
         assert!(

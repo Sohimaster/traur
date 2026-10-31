@@ -2,15 +2,47 @@ pub mod patterns;
 
 use crate::features::Feature;
 use crate::shared::models::PackageContext;
-use crate::shared::scoring::{Signal, SignalCategory};
+use crate::shared::scoring::{Signal, SignalCategory, SignalRole};
 
 pub struct InstallScriptAnalysis;
 
 impl Feature for InstallScriptAnalysis {
     fn analyze(&self, ctx: &PackageContext) -> Vec<Signal> {
-        let Some(ref content) = ctx.install_script_content else {
-            return Vec::new();
-        };
+        let mut signals = Vec::new();
+
+        // An `install=` that names a file nobody can read is an anomaly: pacman
+        // will execute whatever is there, and the analysis saw nothing. It was
+        // previously silent because a failed read returned `None`.
+        if ctx.install_script_content.is_none()
+            && let Some(ref content) = ctx.pkgbuild_content
+            && let Some(name) = crate::shared::local_scan::declared_install_path(content)
+        {
+            signals.push(Signal {
+                id: "P-INSTALL-UNRESOLVED".to_string(),
+                category: SignalCategory::Pkgbuild,
+                role: SignalRole::Capability,
+                // A missing install script is an anomaly rather than a
+                // convention: pacman executes it and nothing checked it. Set
+                // so the signal alone reaches OK (a prompt tier) without
+                // pretending the package is dangerous.
+                points: 50,
+                description: format!(
+                    "install= names '{name}', which was not found; its contents were not analysed"
+                ),
+                is_override_gate: false,
+                matched_line: Some(format!("install={name}")),
+            });
+        }
+
+        if let Some(ref content) = ctx.install_script_content {
+            signals.extend(self.scan(content));
+        }
+        signals
+    }
+}
+
+impl InstallScriptAnalysis {
+    fn scan(&self, content: &str) -> Vec<Signal> {
 
         let compiled = patterns::compiled_patterns();
         let mut signals = Vec::new();
@@ -24,6 +56,7 @@ impl Feature for InstallScriptAnalysis {
                 signals.push(Signal {
                     id: pat.id.clone(),
                     category: SignalCategory::Pkgbuild,
+                    role: SignalRole::Capability,
                     points: pat.points,
                     description: pat.description.clone(),
                     is_override_gate: pat.override_gate,
@@ -52,6 +85,9 @@ mod tests {
             github_stars: None,
             github_not_found: false,
             aur_comments: vec![],
+            local_sources: vec![],
+            source_path: None,
+            incomplete: vec![],
         };
         InstallScriptAnalysis.analyze(&ctx).iter().map(|s| s.id.clone()).collect()
     }

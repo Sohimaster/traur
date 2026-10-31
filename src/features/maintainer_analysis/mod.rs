@@ -1,6 +1,6 @@
 use crate::features::Feature;
 use crate::shared::models::PackageContext;
-use crate::shared::scoring::{Signal, SignalCategory};
+use crate::shared::scoring::{Signal, SignalCategory, SignalRole};
 use std::time::{SystemTime, UNIX_EPOCH};
 
 pub struct MaintainerAnalysis;
@@ -27,6 +27,7 @@ impl Feature for MaintainerAnalysis {
                 signals.push(Signal {
                     id: "B-MAINTAINER-NEW".to_string(),
                     category: SignalCategory::Behavioral,
+                    role: SignalRole::Provenance,
                     points: 30,
                     description: format!(
                         "Maintainer has only 1 package, created {age_days} days ago"
@@ -38,6 +39,7 @@ impl Feature for MaintainerAnalysis {
                 signals.push(Signal {
                     id: "B-MAINTAINER-SINGLE".to_string(),
                     category: SignalCategory::Behavioral,
+                    role: SignalRole::Provenance,
                     points: 15,
                     description: "Maintainer has only 1 package".to_string(),
                     is_override_gate: false,
@@ -57,6 +59,7 @@ impl Feature for MaintainerAnalysis {
             signals.push(Signal {
                 id: "B-MAINTAINER-BATCH".to_string(),
                 category: SignalCategory::Behavioral,
+                role: SignalRole::Provenance,
                 points: 45,
                 description: format!(
                     "Maintainer created {recent_count} packages in the last 48 hours"
@@ -114,6 +117,9 @@ mod tests {
             github_stars: None,
             github_not_found: false,
             aur_comments: vec![],
+            local_sources: vec![],
+            source_path: None,
+            incomplete: vec![],
         };
         let ids: Vec<String> = MaintainerAnalysis.analyze(&ctx).iter().map(|s| s.id.clone()).collect();
         assert!(has(&ids, "B-MAINTAINER-NEW"));
@@ -134,6 +140,9 @@ mod tests {
             github_stars: None,
             github_not_found: false,
             aur_comments: vec![],
+            local_sources: vec![],
+            source_path: None,
+            incomplete: vec![],
         };
         let ids: Vec<String> = MaintainerAnalysis.analyze(&ctx).iter().map(|s| s.id.clone()).collect();
         assert!(has(&ids, "B-MAINTAINER-SINGLE"));
@@ -158,6 +167,9 @@ mod tests {
             github_stars: None,
             github_not_found: false,
             aur_comments: vec![],
+            local_sources: vec![],
+            source_path: None,
+            incomplete: vec![],
         };
         let ids: Vec<String> = MaintainerAnalysis.analyze(&ctx).iter().map(|s| s.id.clone()).collect();
         assert!(has(&ids, "B-MAINTAINER-BATCH"));

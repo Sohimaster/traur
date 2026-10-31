@@ -1,6 +1,6 @@
 use crate::features::Feature;
 use crate::shared::models::PackageContext;
-use crate::shared::scoring::{Signal, SignalCategory};
+use crate::shared::scoring::{Signal, SignalCategory, SignalRole};
 use std::sync::LazyLock;
 use strsim::levenshtein;
 
@@ -54,6 +54,19 @@ const BRAND_NAMES: &[&str] = &[
     "mullvad",
     "nordvpn",
     "tor-browser",
+];
+
+/// Suffixes and infixes that AUR uses to mark a *legitimate* variant of a
+/// package: a prebuilt binary, a VCS snapshot, a desktop-specific build.
+///
+/// `slack-desktop-wayland` embeds `slack-desktop` and `vim-git` embeds `vim`;
+/// reporting those as typosquats was a false positive (FIX.md item 2). A name
+/// that is a top package plus shape suffixes is a variant, not an impostor.
+const VARIANT_SUFFIXES: &[&str] = &[
+    "-bin", "-git", "-svn", "-hg", "-bzr", "-cvs", "-nightly", "-stable",
+    "-beta", "-alpha", "-dev", "-debug", "-headers", "-libs", "-docs", "-doc",
+    "-wayland", "-x11", "-vulkan", "-cuda", "-rocm", "-opencl", "-gles",
+    "-qt5", "-qt6", "-gtk3", "-gtk4", "-lite", "-full", "-minimal",
 ];
 
 static TOP_PACKAGES: LazyLock<Vec<String>> = LazyLock::new(|| {
@@ -126,6 +139,7 @@ impl Feature for NameAnalysis {
                     signals.push(Signal {
                         id: "B-NAME-IMPERSONATE".to_string(),
                         category: SignalCategory::Behavioral,
+                        role: SignalRole::Provenance,
                         points: 65,
                         description: format!(
                             "Name '{name}' looks like impersonation of '{brand}' with suspicious suffix"
@@ -149,6 +163,7 @@ impl Feature for NameAnalysis {
                 signals.push(Signal {
                     id: "B-TYPOSQUAT".to_string(),
                     category: SignalCategory::Behavioral,
+                    role: SignalRole::Provenance,
                     points: 55,
                     description: format!(
                         "Name '{name}' is {dist} edit(s) away from popular package '{top}'"
@@ -160,21 +175,33 @@ impl Feature for NameAnalysis {
             }
         }
 
-        // Check if name embeds a popular package as prefix/suffix (no hyphen boundary)
+        // Check if the name embeds a popular package.
+        //
+        // Only an *impostor* shape counts. `top` plus recognised variant
+        // suffixes (`-bin`, `-git`, `-wayland`, ...) is how AUR names real
+        // variants, so it is reported as a fact at zero points. Anything else
+        // that merely embeds a popular name keeps the behavioural signal.
         for top in TOP_PACKAGES.iter() {
             if name == top.as_str() || name.len() <= top.len() {
                 continue;
             }
             let is_prefix = name.starts_with(top.as_str());
             let is_suffix = name.ends_with(top.as_str());
-            if is_prefix || is_suffix {
+            if !(is_prefix || is_suffix) {
+                continue;
+            }
+            let remainder = if is_prefix {
+                &name[top.len()..]
+            } else {
+                &name[..name.len() - top.len()]
+            };
+            if stripped_variant_suffixes(remainder).is_none() {
                 signals.push(Signal {
                     id: "B-TYPOSQUAT".to_string(),
                     category: SignalCategory::Behavioral,
+                    role: SignalRole::Provenance,
                     points: 55,
-                    description: format!(
-                        "Name '{name}' embeds popular package '{top}'"
-                    ),
+                    description: format!("Name '{name}' embeds popular package '{top}'"),
                     is_override_gate: false,
                     matched_line: None,
                 });
@@ -183,6 +210,32 @@ impl Feature for NameAnalysis {
         }
 
         signals
+    }
+}
+
+/// Strip recognised variant suffixes from `remainder`.
+///
+/// Returns `Some(())` when nothing is left, i.e. the name is exactly a top
+/// package plus shape markers. Returns `None` when unrecognised text remains,
+/// which keeps genuine typosquats scored.
+fn stripped_variant_suffixes(remainder: &str) -> Option<()> {
+    let mut rest = remainder;
+    if rest.is_empty() {
+        return Some(());
+    }
+    // Allow a leading separator so `-bin` and `bin` both reduce to nothing.
+    loop {
+        if rest.is_empty() {
+            return Some(());
+        }
+        if let Some(stripped) = VARIANT_SUFFIXES
+            .iter()
+            .find_map(|s| rest.strip_prefix(s))
+        {
+            rest = stripped;
+            continue;
+        }
+        return None;
     }
 }
 
@@ -202,6 +255,9 @@ mod tests {
             github_stars: None,
             github_not_found: false,
             aur_comments: vec![],
+            local_sources: vec![],
+            source_path: None,
+            incomplete: vec![],
         };
         NameAnalysis.analyze(&ctx).iter().map(|s| s.id.clone()).collect()
     }
@@ -231,6 +287,9 @@ mod tests {
             github_stars: None,
             github_not_found: false,
             aur_comments: vec![],
+            local_sources: vec![],
+            source_path: None,
+            incomplete: vec![],
         };
         NameAnalysis.analyze(&ctx).iter().map(|s| s.id.clone()).collect()
     }
@@ -256,8 +315,15 @@ mod tests {
     fn typosquat_containment() {
         assert!(has(&analyze("yay2"), "B-TYPOSQUAT")); // prefix
         assert!(has(&analyze("2vim"), "B-TYPOSQUAT")); // suffix
-        assert!(has(&analyze("yay-bin"), "B-TYPOSQUAT")); // prefix with hyphen
         assert!(!has(&analyze("myay-bin"), "B-TYPOSQUAT"), "No prefix/suffix match");
+        // A shape suffix is how AUR names a real variant, not an impostor.
+        // This used to fire; FIX.md item 2 reports it as a false positive.
+        assert!(!has(&analyze("yay-bin"), "B-TYPOSQUAT"));
+        assert!(!has(&analyze("slack-desktop-wayland"), "B-TYPOSQUAT"));
+        assert!(!has(&analyze("vim-git"), "B-TYPOSQUAT"));
+        assert!(!has(&analyze("proton-ge-custom-bin"), "B-TYPOSQUAT"));
+        // A real impersonation suffix still fires.
+        assert!(has(&analyze("yay-fixed"), "B-TYPOSQUAT"));
     }
 
     #[test]

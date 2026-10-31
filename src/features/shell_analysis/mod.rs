@@ -1,6 +1,6 @@
 use crate::features::Feature;
 use crate::shared::models::PackageContext;
-use crate::shared::scoring::{Signal, SignalCategory};
+use crate::shared::scoring::{Signal, SignalCategory, SignalRole};
 use regex::Regex;
 use std::collections::{HashMap, HashSet};
 use std::sync::LazyLock;
@@ -272,6 +272,7 @@ fn analyze_quote_split_exec(content: &str) -> Vec<Signal> {
                 signals.push(Signal {
                     id: "SA-QUOTE-SPLIT-EXEC".to_string(),
                     category: SignalCategory::Pkgbuild,
+                    role: SignalRole::Capability,
                     points: 85,
                     description: format!(
                         "quote splitting resolves to '{}|{}' (line {})",
@@ -319,6 +320,7 @@ fn analyze_variable_resolution(
                 signals.push(Signal {
                     id: "SA-VAR-CONCAT-EXEC".to_string(),
                     category: SignalCategory::Pkgbuild,
+                    role: SignalRole::Capability,
                     points: 85,
                     description: format!(
                         "variable concatenation resolves to '{}|{}' (line {})",
@@ -341,6 +343,7 @@ fn analyze_variable_resolution(
             signals.push(Signal {
                 id: "SA-VAR-CONCAT-CMD".to_string(),
                 category: SignalCategory::Pkgbuild,
+                role: SignalRole::Capability,
                 points: 55,
                 description: format!(
                     "variable concatenation resolves to '{}' (line {})",
@@ -401,6 +404,7 @@ fn analyze_indirect_execution(
             return vec![Signal {
                 id: "SA-INDIRECT-EXEC".to_string(),
                 category: SignalCategory::Pkgbuild,
+                role: SignalRole::Capability,
                 points: 70,
                 description: format!(
                     "variable ${} holds '{}' and is used in execution position",
@@ -425,6 +429,7 @@ fn analyze_charbychar_construction(content: &str) -> Vec<Signal> {
             return vec![Signal {
                 id: "SA-CHARBYCHAR-CONSTRUCT".to_string(),
                 category: SignalCategory::Pkgbuild,
+                role: SignalRole::Capability,
                 points: 75,
                 description: format!(
                     "{} printf/echo subshells on line {} (char-by-char command construction)",
@@ -469,6 +474,7 @@ fn analyze_data_blobs(content: &str) -> Vec<Signal> {
             signals.push(Signal {
                 id: "SA-DATA-BLOB-HEX".to_string(),
                 category: SignalCategory::Pkgbuild,
+                role: SignalRole::Capability,
                 points: 50,
                 description: "embedded long hex string (possible encoded payload)".to_string(),
                 is_override_gate: false,
@@ -485,6 +491,7 @@ fn analyze_data_blobs(content: &str) -> Vec<Signal> {
                 signals.push(Signal {
                     id: "SA-DATA-BLOB-BASE64".to_string(),
                     category: SignalCategory::Pkgbuild,
+                    role: SignalRole::Capability,
                     points: 50,
                     description: "embedded long base64 string (possible encoded payload)"
                         .to_string(),
@@ -526,6 +533,7 @@ fn analyze_heredoc_entropy(content: &str) -> Vec<Signal> {
                     return vec![Signal {
                         id: "SA-HIGH-ENTROPY-HEREDOC".to_string(),
                         category: SignalCategory::Pkgbuild,
+                        role: SignalRole::Capability,
                         points: 55,
                         description: format!(
                             "heredoc with high entropy ({:.1} bits/byte, {} bytes)",
@@ -610,6 +618,7 @@ fn analyze_binary_download(content: &str) -> Vec<Signal> {
     vec![Signal {
         id: "SA-BINARY-DOWNLOAD-NOCOMPILE".to_string(),
         category: SignalCategory::Pkgbuild,
+        role: SignalRole::Capability,
         points: 60,
         description: "downloads file and chmod +x with no compilation step".to_string(),
         is_override_gate: false,
@@ -633,6 +642,9 @@ mod tests {
             github_stars: None,
             github_not_found: false,
             aur_comments: vec![],
+            local_sources: vec![],
+            source_path: None,
+            incomplete: vec![],
         };
         ShellAnalysis.analyze(&ctx).iter().map(|s| s.id.clone()).collect()
     }
@@ -944,6 +956,9 @@ package() {
             github_stars: None,
             github_not_found: false,
             aur_comments: vec![],
+            local_sources: vec![],
+            source_path: None,
+            incomplete: vec![],
         };
         ShellAnalysis.analyze(&ctx).iter().map(|s| s.id.clone()).collect()
     }

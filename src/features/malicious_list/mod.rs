@@ -1,6 +1,6 @@
 use crate::features::Feature;
 use crate::shared::models::PackageContext;
-use crate::shared::scoring::{Signal, SignalCategory};
+use crate::shared::scoring::{Signal, SignalCategory, SignalRole};
 
 /// URL of the shared list of AUR packages compromised in the June 2026
 /// "Atomic Arch" incident (issue #17).
@@ -23,6 +23,7 @@ impl Feature for MaliciousListAnalysis {
             return vec![Signal {
                 id: "B-MALICIOUS-LIST".to_string(),
                 category: SignalCategory::Behavioral,
+                role: SignalRole::OverrideGate,
                 points: 100,
                 description:
                     "Package appears on the public list of packages compromised in the AUR malware incident"
@@ -165,6 +166,9 @@ mod integration_tests {
             github_stars: None,
             github_not_found: false,
             aur_comments: vec![],
+            local_sources: vec![],
+            source_path: None,
+            incomplete: vec![],
         }
     }
 

@@ -1,7 +1,7 @@
 use crate::features::Feature;
 use crate::shared::models::PackageContext;
 use crate::shared::patterns;
-use crate::shared::scoring::{Signal, SignalCategory};
+use crate::shared::scoring::{Signal, SignalCategory, SignalRole};
 use regex::Regex;
 use std::collections::HashSet;
 use std::sync::LazyLock;
@@ -59,6 +59,7 @@ fn check_new_suspicious(new: &str, old: &str, signals: &mut Vec<Signal>) {
             signals.push(Signal {
                 id: "T-DIFF-NEW-SUSPICIOUS".to_string(),
                 category: SignalCategory::Temporal,
+                role: SignalRole::Capability,
                 points: 40,
                 description: format!(
                     "Newly introduced suspicious pattern: {} ({})",
@@ -84,6 +85,7 @@ fn check_new_dangerous_dep(new: &str, old: &str, signals: &mut Vec<Signal>) {
             signals.push(Signal {
                 id: "T-DIFF-NEW-DEP-NPM-BUN".to_string(),
                 category: SignalCategory::Temporal,
+                role: SignalRole::Capability,
                 points: 50,
                 description: format!("Newly added {} dependency (often used for supply chain attacks)", dangerous),
                 is_override_gate: false,
@@ -122,6 +124,7 @@ fn check_checksum_removed(new: &str, old: &str, signals: &mut Vec<Signal>) {
         signals.push(Signal {
             id: "T-DIFF-CHECKSUM-REMOVED".to_string(),
             category: SignalCategory::Temporal,
+            role: SignalRole::Capability,
             points: 35,
             description: "Checksum array removed in latest update".to_string(),
             is_override_gate: false,
@@ -138,6 +141,7 @@ fn check_checksum_removed(new: &str, old: &str, signals: &mut Vec<Signal>) {
             signals.push(Signal {
                 id: "T-DIFF-CHECKSUM-REMOVED".to_string(),
                 category: SignalCategory::Temporal,
+                role: SignalRole::Capability,
                 points: 35,
                 description: "All checksums changed to SKIP in latest update".to_string(),
                 is_override_gate: false,
@@ -187,6 +191,7 @@ fn check_source_domain_changed(new: &str, old: &str, signals: &mut Vec<Signal>) 
         signals.push(Signal {
             id: "T-DIFF-SOURCE-DOMAIN-CHANGED".to_string(),
             category: SignalCategory::Temporal,
+            role: SignalRole::Capability,
             points: 30,
             description: format!(
                 "Source URLs changed to new domain(s): {}",
@@ -239,6 +244,7 @@ fn check_major_rewrite(new: &str, old: &str, signals: &mut Vec<Signal>) {
         signals.push(Signal {
             id: "T-DIFF-MAJOR-REWRITE".to_string(),
             category: SignalCategory::Temporal,
+            role: SignalRole::Capability,
             points: 15,
             description: format!("{}% of PKGBUILD lines changed (unusual for version bump)", changed_pct),
             is_override_gate: false,
@@ -267,6 +273,9 @@ mod tests {
             github_stars: None,
             github_not_found: false,
             aur_comments: vec![],
+            local_sources: vec![],
+            source_path: None,
+            incomplete: vec![],
         };
         PkgbuildDiffAnalysis
             .analyze(&ctx)
@@ -288,6 +297,9 @@ mod tests {
             github_stars: None,
             github_not_found: false,
             aur_comments: vec![],
+            local_sources: vec![],
+            source_path: None,
+            incomplete: vec![],
         };
         assert!(PkgbuildDiffAnalysis.analyze(&ctx).is_empty());
     }

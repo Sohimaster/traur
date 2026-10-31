@@ -1,6 +1,6 @@
 use crate::features::Feature;
 use crate::shared::models::PackageContext;
-use crate::shared::scoring::{Signal, SignalCategory};
+use crate::shared::scoring::{Signal, SignalCategory, SignalRole};
 
 pub struct GitHubStars;
 
@@ -12,6 +12,7 @@ impl Feature for GitHubStars {
             signals.push(Signal {
                 id: "M-GITHUB-NOT-FOUND".to_string(),
                 category: SignalCategory::Metadata,
+                role: SignalRole::Provenance,
                 points: 25,
                 description: "Upstream URL points to GitHub but repo does not exist".to_string(),
                 is_override_gate: false,
@@ -28,6 +29,7 @@ impl Feature for GitHubStars {
                 signals.push(Signal {
                     id: "M-GITHUB-STARS-ZERO".to_string(),
                     category: SignalCategory::Metadata,
+                    role: SignalRole::Provenance,
                     points: 20,
                     description: "Upstream GitHub repo has 0 stars".to_string(),
                     is_override_gate: false,
@@ -37,6 +39,7 @@ impl Feature for GitHubStars {
                 signals.push(Signal {
                     id: "M-GITHUB-STARS-LOW".to_string(),
                     category: SignalCategory::Metadata,
+                    role: SignalRole::Provenance,
                     points: 10,
                     description: format!("Upstream GitHub repo has very few stars ({stars})"),
                     is_override_gate: false,
@@ -69,6 +72,9 @@ mod tests {
             github_stars: stars,
             github_not_found: not_found,
             aur_comments: vec![],
+            local_sources: vec![],
+            source_path: None,
+            incomplete: vec![],
         };
         GitHubStars
             .analyze(&ctx)

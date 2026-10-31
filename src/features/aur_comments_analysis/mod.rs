@@ -1,6 +1,6 @@
 use crate::features::Feature;
 use crate::shared::models::PackageContext;
-use crate::shared::scoring::{Signal, SignalCategory};
+use crate::shared::scoring::{Signal, SignalCategory, SignalRole};
 
 const SECURITY_KEYWORDS: &[&str] = &[
     "malware",
@@ -41,6 +41,7 @@ impl Feature for AurCommentsAnalysis {
                     return vec![Signal {
                         id: "M-COMMENTS-SECURITY".to_string(),
                         category: SignalCategory::Metadata,
+                        role: SignalRole::Provenance,
                         points: 40,
                         description: format!(
                             "AUR comment mentions security concern (keyword: {keyword})"
@@ -76,6 +77,9 @@ mod tests {
             github_stars: None,
             github_not_found: false,
             aur_comments: comments.into_iter().map(|s| s.to_string()).collect(),
+            local_sources: vec![],
+            source_path: None,
+            incomplete: vec![],
         };
         AurCommentsAnalysis
             .analyze(&ctx)

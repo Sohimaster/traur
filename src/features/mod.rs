@@ -1,6 +1,7 @@
 pub mod aur_comments_analysis;
 pub mod bin_source_verification;
 pub mod checksum_analysis;
+pub mod eval_analysis;
 pub mod git_history_analysis;
 pub mod github_stars;
 pub mod gtfobins_analysis;
@@ -12,6 +13,7 @@ pub mod name_analysis;
 pub mod orphan_takeover_analysis;
 pub mod pkgbuild_analysis;
 pub mod pkgbuild_diff_analysis;
+pub mod pipe_chain_analysis;
 pub mod shell_analysis;
 pub mod source_url_analysis;
 
@@ -37,6 +39,8 @@ pub fn all_features() -> Vec<Box<dyn Feature>> {
         Box::new(orphan_takeover_analysis::OrphanTakeoverAnalysis),
         Box::new(git_history_analysis::GitHistoryAnalysis),
         Box::new(shell_analysis::ShellAnalysis),
+        Box::new(eval_analysis::EvalAnalysis),
+        Box::new(pipe_chain_analysis::PipeChainAnalysis),
         Box::new(gtfobins_analysis::GtfobinsAnalysis),
         Box::new(bin_source_verification::BinSourceVerification),
         Box::new(malicious_list::MaliciousListAnalysis),

@@ -2,7 +2,7 @@ pub mod patterns;
 
 use crate::features::Feature;
 use crate::shared::models::PackageContext;
-use crate::shared::scoring::{Signal, SignalCategory};
+use crate::shared::scoring::{Signal, SignalCategory, SignalRole};
 use regex::Regex;
 use std::sync::LazyLock;
 
@@ -36,6 +36,7 @@ impl Feature for SourceUrlAnalysis {
                 signals.push(Signal {
                     id: pat.id.clone(),
                     category: SignalCategory::Pkgbuild,
+                    role: SignalRole::for_signal(&pat.id, pat.points),
                     points: pat.points,
                     description: pat.description.clone(),
                     is_override_gate: pat.override_gate,
@@ -65,6 +66,9 @@ mod tests {
             github_stars: None,
             github_not_found: false,
             aur_comments: vec![],
+            local_sources: vec![],
+            source_path: None,
+            incomplete: vec![],
         };
         SourceUrlAnalysis.analyze(&ctx).iter().map(|s| s.id.clone()).collect()
     }
@@ -159,6 +163,9 @@ mod tests {
             github_stars: None,
             github_not_found: false,
             aur_comments: vec![],
+            local_sources: vec![],
+            source_path: None,
+            incomplete: vec![],
         };
         let ids: Vec<String> = SourceUrlAnalysis.analyze(&ctx).iter().map(|s| s.id.clone()).collect();
         assert!(!has(&ids, "P-PASTEBIN"), "Should not detect pastebin URL in comment");

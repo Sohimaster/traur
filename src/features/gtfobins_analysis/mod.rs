@@ -2,7 +2,7 @@ pub mod patterns;
 
 use crate::features::Feature;
 use crate::shared::models::PackageContext;
-use crate::shared::scoring::{Signal, SignalCategory};
+use crate::shared::scoring::{Signal, SignalCategory, SignalRole};
 
 pub struct GtfobinsAnalysis;
 
@@ -34,6 +34,10 @@ fn match_patterns(content: &str, id_prefix: &str, desc_suffix: &str) -> Vec<Sign
             signals.push(Signal {
                 id: format!("{}{}", id_prefix, pat.id),
                 category: SignalCategory::Pkgbuild,
+                // Lifecycle patterns are declared as facts in the registry
+                // (`SignalRole::for_signal`), so a `.service` install cannot
+                // drag a package out of OK (PLAN.md N4.2).
+                role: SignalRole::for_signal(&format!("{}{}", id_prefix, pat.id), pat.points),
                 points: pat.points,
                 description: if desc_suffix.is_empty() {
                     pat.description.clone()
@@ -65,6 +69,9 @@ mod tests {
             github_stars: None,
             github_not_found: false,
             aur_comments: vec![],
+            local_sources: vec![],
+            source_path: None,
+            incomplete: vec![],
         };
         GtfobinsAnalysis.analyze(&ctx).iter().map(|s| s.id.clone()).collect()
     }
@@ -957,6 +964,9 @@ build() {
             github_stars: None,
             github_not_found: false,
             aur_comments: vec![],
+            local_sources: vec![],
+            source_path: None,
+            incomplete: vec![],
         };
         GtfobinsAnalysis.analyze(&ctx).iter().map(|s| s.id.clone()).collect()
     }

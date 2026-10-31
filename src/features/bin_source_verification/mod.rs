@@ -1,6 +1,6 @@
 use crate::features::Feature;
 use crate::shared::models::PackageContext;
-use crate::shared::scoring::{Signal, SignalCategory};
+use crate::shared::scoring::{Signal, SignalCategory, SignalRole};
 use regex::Regex;
 use std::sync::LazyLock;
 
@@ -75,6 +75,7 @@ impl Feature for BinSourceVerification {
                         signals.push(Signal {
                             id: "B-BIN-GITHUB-ORG-MISMATCH".to_string(),
                             category: SignalCategory::Behavioral,
+                            role: SignalRole::Provenance,
                             points: 50,
                             description: format!(
                                 "-bin package upstream is github.com/{u_org} but source downloads from github.com/{s_org}"
@@ -92,6 +93,7 @@ impl Feature for BinSourceVerification {
                 signals.push(Signal {
                     id: "B-BIN-DOMAIN-MISMATCH".to_string(),
                     category: SignalCategory::Behavioral,
+                    role: SignalRole::Provenance,
                     points: 30,
                     description: format!(
                         "-bin package upstream is {upstream_domain} but source downloads from {src_domain}"
@@ -216,6 +218,9 @@ mod tests {
             github_stars: None,
             github_not_found: false,
             aur_comments: vec![],
+            local_sources: vec![],
+            source_path: None,
+            incomplete: vec![],
         };
         BinSourceVerification.analyze(&ctx)
     }
