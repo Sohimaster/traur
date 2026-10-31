@@ -43,11 +43,12 @@ traur allow <package>     # whitelist a package
 ## Detection coverage
 
 Patterns derived from real AUR malware incidents:
+- **Atomic Arch (2026)** — orphan takeover, build-time `npm`/`bun` dependency injection (`atomic-lockfile`, `js-digest`), eBPF rootkit loading, cloud credential harvesting
 - **CHAOS RAT (2025)** — browser impersonation packages, RAT distribution
 - **Google Chrome RAT (2025)** — .install script, Python download+execute
 - **Acroread (2018)** — orphan takeover, curl from paste service, systemd persistence
 
-Categories: download-and-execute, reverse shells, credential theft, persistence mechanisms, privilege escalation, C2/exfiltration, cryptocurrency mining, code obfuscation, kernel module loading, environment variable theft, system reconnaissance.
+Categories: download-and-execute, reverse shells, credential theft, persistence mechanisms, privilege escalation, C2/exfiltration, cryptocurrency mining, code obfuscation, kernel module and eBPF loading, build-time package-manager installs, environment variable theft, system reconnaissance.
 
 ## License
 
