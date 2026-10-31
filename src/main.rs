@@ -43,6 +43,11 @@ enum Commands {
         /// Only show flagged packages (SKETCHY and above)
         #[arg(short = 'f', long)]
         flagged_only: bool,
+
+        /// Send a desktop notification when packages are flagged
+        /// (for unattended runs from a systemd timer or cron)
+        #[arg(long)]
+        notify: bool,
     },
     /// Whitelist a package (skip future scans)
     Allow {
@@ -102,7 +107,17 @@ fn main() {
             json,
             verbose,
             flagged_only,
-        } => cmd_scan(package, pkgbuild, all_installed, jobs, json, verbose, flagged_only),
+            notify,
+        } => cmd_scan(
+            package,
+            pkgbuild,
+            all_installed,
+            jobs,
+            json,
+            verbose,
+            flagged_only,
+            notify,
+        ),
         Commands::Allow { package } => cmd_allow(&package),
         Commands::Bench { count, jobs } => bench::run(count, jobs),
         Commands::Signals { json } => cmd_signals(json),
@@ -122,6 +137,7 @@ fn cmd_scan(
     json: bool,
     verbose: bool,
     flagged_only: bool,
+    notify: bool,
 ) -> i32 {
     if let Some(path) = pkgbuild {
         let content = match std::fs::read_to_string(&path) {
@@ -150,7 +166,7 @@ fn cmd_scan(
     }
 
     // No package, no pkgbuild -> scan all installed AUR packages
-    cmd_scan_all_installed(jobs, json, verbose, flagged_only)
+    cmd_scan_all_installed(jobs, json, verbose, flagged_only, notify)
 }
 
 fn cmd_scan_single(pkg: &str, json: bool, verbose: bool) -> i32 {
@@ -169,7 +185,13 @@ fn cmd_scan_single(pkg: &str, json: bool, verbose: bool) -> i32 {
     }
 }
 
-fn cmd_scan_all_installed(jobs: usize, json: bool, verbose: bool, flagged_only: bool) -> i32 {
+fn cmd_scan_all_installed(
+    jobs: usize,
+    json: bool,
+    verbose: bool,
+    flagged_only: bool,
+    notify: bool,
+) -> i32 {
     use crate::shared::bulk::{batch_fetch_metadata, clone_with_retry, prefetch_maintainer_packages};
     use crate::shared::scoring::{ScanResult, Tier};
     use colored::Colorize;
@@ -315,9 +337,49 @@ fn cmd_scan_all_installed(jobs: usize, json: bool, verbose: bool, flagged_only: 
         }
     }
 
-    let has_critical = tier_counts[3].load(Ordering::Relaxed) > 0
-        || tier_counts[4].load(Ordering::Relaxed) > 0;
+    let suspicious = tier_counts[3].load(Ordering::Relaxed);
+    let malicious = tier_counts[4].load(Ordering::Relaxed);
+    let has_critical = suspicious > 0 || malicious > 0;
+
+    if notify {
+        notify_flagged(suspicious, malicious);
+    }
+
     if has_critical { 1 } else { 0 }
+}
+
+/// Show a desktop notification when a scan finds critical packages.
+///
+/// This is what makes unattended scanning useful: run
+/// `traur scan --flagged-only --notify` from a systemd timer and only hear
+/// about it when something needs attention. Failure to notify is not an error.
+fn notify_flagged(suspicious: u64, malicious: u64) {
+    use std::process::Command;
+
+    if suspicious == 0 && malicious == 0 {
+        return;
+    }
+
+    let mut parts = Vec::new();
+    if malicious > 0 {
+        parts.push(format!("{malicious} MALICIOUS"));
+    }
+    if suspicious > 0 {
+        parts.push(format!("{suspicious} SUSPICIOUS"));
+    }
+    let body = format!(
+        "{} AUR package(s) flagged. Run 'traur scan --flagged-only' for details.",
+        parts.join(", ")
+    );
+
+    let _ = Command::new("notify-send")
+        .args([
+            "--urgency=critical",
+            "--app-name=traur",
+            "traur: AUR packages need review",
+            &body,
+        ])
+        .status();
 }
 
 /// Get list of installed AUR (foreign) package names via `pacman -Qm`.

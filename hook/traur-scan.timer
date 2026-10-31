@@ -1,0 +1,11 @@
+[Unit]
+Description=Daily scan of installed AUR packages
+
+[Timer]
+OnCalendar=daily
+RandomizedDelaySec=1h
+Persistent=true
+Unit=traur-scan.service
+
+[Install]
+WantedBy=timers.target

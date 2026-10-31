@@ -1,0 +1,12 @@
+[Unit]
+Description=Scan installed AUR packages for security issues
+Documentation=https://github.com/Sohimaster/traur
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+# --notify needs a session bus; the user timer below provides one. When started
+# from a system timer instead, the notification is skipped and the exit status
+# (non-zero when SUSPICIOUS or MALICIOUS packages are found) is the signal.
+ExecStart=/usr/bin/traur scan --flagged-only --notify

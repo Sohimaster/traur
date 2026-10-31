@@ -19,6 +19,20 @@ paru -S traur
 traur scan                # scan all installed aur packages
 traur scan <package>      # scan a package
 traur allow <package>     # whitelist a package
+traur clean [package]     # remove cached git clones
+```
+
+The package ships a `traur-scan.timer` for unattended scanning:
+
+```bash
+systemctl enable --now traur-scan.timer   # daily, notifies when packages are flagged
+```
+
+Or run it yourself from cron with exit status as the signal (non-zero when a
+SUSPICIOUS or MALICIOUS package is found):
+
+```bash
+traur scan --flagged-only --json
 ```
 
 ## How it works
