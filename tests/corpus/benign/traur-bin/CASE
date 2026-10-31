@@ -1,0 +1,3 @@
+max_tier=ok
+note=real AUR package; must not be flagged for normal packaging conventions
+revision=36eb30c4ab00cdd2dca8570c7c511dd569a1cc74

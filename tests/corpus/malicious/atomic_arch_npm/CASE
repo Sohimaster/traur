@@ -1,0 +1,3 @@
+min_tier=malicious
+required=P-NPM-ATOMIC-ARCH-NAMES
+note=Atomic Arch campaign: build-time npm injection of atomic-lockfile

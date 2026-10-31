@@ -1,0 +1,3 @@
+min_tier=suspicious
+required=SA-EXFIL-PIPE
+note=credential exfiltration from .install hook (the July 2026 librewolf-fix-bin shape); scored 89/100 TRUSTED before the composition engine

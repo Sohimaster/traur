@@ -1,0 +1,3 @@
+min_tier=suspicious
+required=SA-,
+note=committed source=() file executed at build time; scored 100/100 TRUSTED before local source analysis

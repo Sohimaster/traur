@@ -1,0 +1,13 @@
+pkgname=zig-lite-bin
+pkgver=0.14.0
+pkgrel=1
+pkgdesc='Compiler toolchain'
+arch=('x86_64')
+url='https://github.com/legit/zig-lite'
+license=('MIT')
+source=("https://github.com/legit/zig-lite/releases/download/$pkgver/zig-lite.tar.xz")
+sha256sums=('SKIP')
+
+build() {
+  eval "$pkgver"
+}

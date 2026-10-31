@@ -1,0 +1,16 @@
+# snippet server needs to monitor input devices: elevated privileges are required (needs to read /dev/input/eventXX)
+# this binary is spawned by the unprivileged vicinae server at startup and its only responsibility is to monitor input events
+# and notify the server when a snippet needs to be expanded.
+
+post_install() {
+  setcap "cap_dac_override+ep" /usr/libexec/vicinae/vicinae-input-server
+
+  # required for input injection through /dev/uinput.
+  # Since, v0.20.3, we install a file under $prefix/lib/modules-load.d/vicinae.conf already, but it will only be considered after a reboot.
+  # So this is to make sure the module is loaded right away.
+  modprobe uinput || echo "Failed to modprobe uinput: snippets and paste may not work, or only after a reboot.";
+}
+
+post_upgrade() {
+  post_install
+}

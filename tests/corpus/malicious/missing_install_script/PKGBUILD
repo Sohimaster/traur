@@ -1,0 +1,14 @@
+pkgname=orphan-hook
+pkgver=1.0
+pkgrel=1
+pkgdesc='Tool with an unresolved install script'
+arch=('x86_64')
+url='https://github.com/legit/orphan-hook'
+license=('MIT')
+install="$pkgname.install"
+source=("https://github.com/legit/orphan-hook/archive/v$pkgver.tar.gz")
+sha256sums=('SKIP')
+
+package() {
+  install -Dm755 tool "$pkgdir/usr/bin/tool"
+}

@@ -1,0 +1,4 @@
+min_tier=trusted
+max_tier=trusted
+forbidden=P-EVAL-VAR
+note=eval of a version variable is the zig0.14-bin shape and must stay a fact

@@ -1,0 +1,17 @@
+pkgname=sourced-config
+pkgver=1.0
+pkgrel=1
+pkgdesc='A tool that appears to just build'
+arch=('x86_64')
+url='https://github.com/legit/sourced-config'
+license=('MIT')
+source=("https://github.com/legit/sourced-config/archive/v$pkgver.tar.gz"
+        "config.defaults")
+sha256sums=('SKIP'
+            'a1b2c3')
+
+build() {
+  cd "$srcdir"
+  source ../config.defaults
+  make
+}

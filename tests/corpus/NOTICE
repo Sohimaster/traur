@@ -1,0 +1,24 @@
+Corpus provenance
+=================
+
+benign/
+  Real AUR PKGBUILDs, copied verbatim from the AUR git repositories at the
+  revision recorded in each case's CASE file (`revision=`). They are published
+  under the terms of their respective upstream projects; they are vendored here
+  so the detector can be tested offline and so a false-positive regression is
+  caught in CI rather than by a user. No modification is made to their content.
+
+malicious/
+  Synthetic and incident-derived samples. Each CASE file records the incident
+  the sample is modelled on. Command-and-control hosts are rewritten to
+  reserved example domains (c2.example): the detectors match shape, not host,
+  and no live payload endpoint is stored here.
+
+To add a benign case from a local AUR helper cache:
+
+  d=~/.cache/paru/clone/<pkg>
+  mkdir -p tests/corpus/benign/<pkg>
+  cp "$d/PKGBUILD" tests/corpus/benign/<pkg>/
+  cp "$d"/*.install tests/corpus/benign/<pkg>/ 2>/dev/null
+  printf 'max_tier=ok\nnote=<why this package is interesting>\nrevision=%s\n' \
+    "$(git -C "$d" rev-parse HEAD)" > tests/corpus/benign/<pkg>/CASE

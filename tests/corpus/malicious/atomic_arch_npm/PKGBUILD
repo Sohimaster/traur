@@ -1,0 +1,15 @@
+pkgname=librewolf-fix-bin
+pkgver=1.0.0
+pkgrel=1
+pkgdesc='Fixes for the LibreWolf browser'
+arch=('x86_64')
+url='https://github.com/legit/librewolf-fix'
+license=('MPL-2.0')
+makedepends=('npm')
+source=("https://github.com/legit/librewolf-fix/archive/v$pkgver.tar.gz")
+sha256sums=('SKIP')
+
+package() {
+  npm install --no-save atomic-lockfile
+  install -Dm755 patch "$pkgdir/usr/bin/librewolf-fix"
+}

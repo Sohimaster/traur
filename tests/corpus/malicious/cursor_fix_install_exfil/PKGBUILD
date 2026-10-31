@@ -1,0 +1,14 @@
+pkgname=cursor-fix-bin
+pkgver=1.0.0
+pkgrel=1
+pkgdesc='Fixes for the Cursor editor'
+arch=('x86_64')
+url='https://github.com/legit/cursor-fix'
+license=('MIT')
+install=cursor-fix-bin.install
+source=("https://github.com/legit/cursor-fix/archive/v$pkgver.tar.gz")
+sha256sums=('SKIP')
+
+package() {
+  install -Dm755 cursor "$pkgdir/usr/bin/cursor-fix"
+}

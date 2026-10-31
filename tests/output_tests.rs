@@ -4,12 +4,13 @@
 //! ensuring signal details are always shown regardless of tier.
 
 use traur::shared::output;
-use traur::shared::scoring::{ScanResult, Signal, SignalCategory, Tier};
+use traur::shared::scoring::{ScanResult, Signal, SignalCategory, SignalRole, Tier};
 
 fn make_signal(id: &str, category: SignalCategory, points: u32, description: &str, override_gate: bool) -> Signal {
     Signal {
         id: id.to_string(),
         category,
+        role: SignalRole::Composition,
         points,
         description: description.to_string(),
         is_override_gate: override_gate,
@@ -21,6 +22,7 @@ fn make_signal_with_line(id: &str, category: SignalCategory, points: u32, descri
     Signal {
         id: id.to_string(),
         category,
+        role: SignalRole::Composition,
         points,
         description: description.to_string(),
         is_override_gate: override_gate,
@@ -45,6 +47,9 @@ fn trusted_no_signals() {
         tier: Tier::Trusted,
         signals: vec![],
         override_gate_fired: None,
+        schema_version: 1,
+        status: traur::shared::scoring::ScanStatus::Complete,
+        reason: None,
     };
     let out = render(&result, false);
     assert_eq!(out, "\
@@ -65,6 +70,9 @@ fn trusted_with_signals() {
             make_signal("M-VOTES-LOW", SignalCategory::Metadata, 5, "Low vote count", false),
         ],
         override_gate_fired: None,
+        schema_version: 1,
+        status: traur::shared::scoring::ScanStatus::Complete,
+        reason: None,
     };
     let out = render(&result, false);
     assert_eq!(out, "\
@@ -89,6 +97,9 @@ fn ok_with_signals() {
             make_signal("P-WGET-DOWNLOAD", SignalCategory::Pkgbuild, 35, "Downloads file with wget", false),
         ],
         override_gate_fired: None,
+        schema_version: 1,
+        status: traur::shared::scoring::ScanStatus::Complete,
+        reason: None,
     };
     let out = render(&result, false);
     assert_eq!(out, "\
@@ -113,6 +124,9 @@ fn sketchy_with_signals() {
             make_signal("M-VOTES-ZERO", SignalCategory::Metadata, 20, "Zero votes", false),
         ],
         override_gate_fired: None,
+        schema_version: 1,
+        status: traur::shared::scoring::ScanStatus::Complete,
+        reason: None,
     };
     let out = render(&result, false);
     assert_eq!(out, "\
@@ -138,6 +152,9 @@ fn suspicious_with_signals() {
             make_signal("B-NAME-IMPERSONATE", SignalCategory::Behavioral, 65, "Name impersonates popular package", false),
         ],
         override_gate_fired: None,
+        schema_version: 1,
+        status: traur::shared::scoring::ScanStatus::Complete,
+        reason: None,
     };
     let out = render(&result, false);
     assert_eq!(out, "\
@@ -163,6 +180,9 @@ fn malicious_with_override_gate() {
             make_signal("P-RAW-IP-URL", SignalCategory::Pkgbuild, 30, "Source URL uses raw IP address", false),
         ],
         override_gate_fired: Some("P-CURL-PIPE".to_string()),
+        schema_version: 1,
+        status: traur::shared::scoring::ScanStatus::Complete,
+        reason: None,
     };
     let out = render(&result, false);
     assert_eq!(out, "\
@@ -185,6 +205,9 @@ fn malicious_no_signals_only_gate() {
             make_signal("P-REVSHELL-DEVTCP", SignalCategory::Pkgbuild, 90, "Reverse shell via /dev/tcp", true),
         ],
         override_gate_fired: Some("P-REVSHELL-DEVTCP".to_string()),
+        schema_version: 1,
+        status: traur::shared::scoring::ScanStatus::Complete,
+        reason: None,
     };
     let out = render(&result, false);
     assert_eq!(out, "\
@@ -212,6 +235,9 @@ fn verbose_shows_matched_lines() {
             make_signal("M-VOTES-ZERO", SignalCategory::Metadata, 20, "Zero votes", false),
         ],
         override_gate_fired: Some("P-CURL-PIPE".to_string()),
+        schema_version: 1,
+        status: traur::shared::scoring::ScanStatus::Complete,
+        reason: None,
     };
     let out = render(&result, true);
     assert_eq!(out, "\
@@ -235,6 +261,9 @@ fn verbose_without_matched_line_shows_nothing_extra() {
             make_signal("M-NEW-PACKAGE", SignalCategory::Metadata, 10, "Package is less than 6 months old", false),
         ],
         override_gate_fired: None,
+        schema_version: 1,
+        status: traur::shared::scoring::ScanStatus::Complete,
+        reason: None,
     };
     let verbose_out = render(&result, true);
     let normal_out = render(&result, false);
@@ -261,6 +290,9 @@ fn signal_prefix_levels() {
             make_signal("LOW", SignalCategory::Metadata, 10, "low severity", false),
         ],
         override_gate_fired: Some("GATE".to_string()),
+        schema_version: 1,
+        status: traur::shared::scoring::ScanStatus::Complete,
+        reason: None,
     };
     let out = render(&result, false);
     // Verify each prefix level

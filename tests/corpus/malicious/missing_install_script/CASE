@@ -1,0 +1,3 @@
+min_tier=ok
+required=P-INSTALL-UNRESOLVED
+note=install= names a file that is not present; pacman would execute whatever it is

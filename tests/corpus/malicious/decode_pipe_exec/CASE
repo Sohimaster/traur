@@ -1,0 +1,3 @@
+min_tier=malicious
+required=SA-PIPE-,
+note=download then decode then execute; P-CURL-PIPE cannot cross the base64 stage
