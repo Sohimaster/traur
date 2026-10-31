@@ -86,7 +86,31 @@ fn main() {
         .collect();
 
     // Batch-fetch AUR metadata to separate real AUR packages from local-only ones
-    let metadata = bulk::batch_fetch_metadata(&to_scan);
+    let (metadata, failed_batches) = bulk::batch_fetch_metadata_with_errors(&to_scan);
+
+    // The AUR was unreachable. Pacman forks with network isolation (CachyOS)
+    // land here for every package. Treating that as "not on AUR" would skip
+    // the scan and let the transaction through unscanned, so block instead
+    // unless the user explicitly opts out.
+    if failed_batches > 0 && metadata.is_empty() && !offline_scan_allowed() {
+        let _ = writeln!(tty);
+        let _ = writeln!(
+            tty,
+            "{}",
+            "traur: could not reach the AUR — blocking transaction".red().bold()
+        );
+        let _ = writeln!(
+            tty,
+            "traur: packages cannot be scanned without AUR metadata."
+        );
+        let _ = writeln!(
+            tty,
+            "traur: if this hook runs without network access (CachyOS isolates\n\
+             traur: hooks), set TRAUR_ALLOW_OFFLINE=1 to allow unscanned installs."
+        );
+        std::process::exit(1);
+    }
+
     let not_found: Vec<&str> = to_scan
         .iter()
         .filter(|n| !metadata.contains_key(n.as_str()))
@@ -272,6 +296,16 @@ fn main() {
     let _ = writeln!(tty, "\n  {}", "All packages look clean.".green());
 }
 
+/// Whether the user opted out of blocking when the AUR is unreachable.
+/// See issue #24: pacman forks with network isolation cannot reach the AUR
+/// from inside the hook, and without this the hook would allow unscanned
+/// installs silently.
+fn offline_scan_allowed() -> bool {
+    std::env::var("TRAUR_ALLOW_OFFLINE")
+        .map(|v| matches!(v.as_str(), "1" | "true" | "yes"))
+        .unwrap_or(false)
+}
+
 /// Get all package names from official sync databases in one call.
 /// Output format: "repo package_name version [installed]"
 fn official_repo_packages() -> HashSet<String> {
@@ -285,4 +319,21 @@ fn official_repo_packages() -> HashSet<String> {
                 .collect()
         })
         .unwrap_or_default()
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn offline_escape_hatch_values() {
+        // The hook is a separate binary; this exercises the same parsing.
+        fn parse(v: Option<&str>) -> bool {
+            v.map(|v| matches!(v, "1" | "true" | "yes")).unwrap_or(false)
+        }
+        assert!(parse(Some("1")));
+        assert!(parse(Some("true")));
+        assert!(parse(Some("yes")));
+        assert!(!parse(Some("0")));
+        assert!(!parse(Some("")));
+        assert!(!parse(None));
+    }
 }

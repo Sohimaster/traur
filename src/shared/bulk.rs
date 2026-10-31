@@ -10,8 +10,14 @@ pub const MAX_RETRIES: u32 = 3;
 pub const RETRY_BASE_DELAY: Duration = Duration::from_secs(2);
 
 /// Fetch AUR metadata for a batch of package names via the RPC API.
-pub fn batch_fetch_metadata(names: &[String]) -> HashMap<String, AurPackage> {
+///
+/// Returns the packages that were found plus the number of batches that
+/// failed to reach the AUR at all. A failure is not the same as "not on
+/// AUR": callers that gate on scan results must not treat an unreachable
+/// network as a clean bill of health.
+pub fn batch_fetch_metadata_with_errors(names: &[String]) -> (HashMap<String, AurPackage>, usize) {
     let mut map = HashMap::new();
+    let mut failed_batches = 0usize;
 
     for chunk in names.chunks(RPC_BATCH_SIZE) {
         let refs: Vec<&str> = chunk.iter().map(|s| s.as_str()).collect();
@@ -23,11 +29,21 @@ pub fn batch_fetch_metadata(names: &[String]) -> HashMap<String, AurPackage> {
             }
             Err(e) => {
                 eprintln!("  Warning: batch metadata fetch failed: {e}");
+                failed_batches += 1;
             }
         }
     }
 
-    map
+    (map, failed_batches)
+}
+
+/// Fetch AUR metadata for a batch of package names via the RPC API.
+///
+/// Thin wrapper that drops the failure count; use
+/// [`batch_fetch_metadata_with_errors`] when the caller must distinguish
+/// "not on the AUR" from "the AUR was unreachable".
+pub fn batch_fetch_metadata(names: &[String]) -> HashMap<String, AurPackage> {
+    batch_fetch_metadata_with_errors(names).0
 }
 
 /// Pre-fetch all maintainer package lists in parallel.
