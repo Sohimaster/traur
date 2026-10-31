@@ -55,7 +55,6 @@ mod tests {
     fn analyze(source_url: &str) -> Vec<String> {
         let content = format!("pkgname=test\nsource=('{source_url}')\n");
         let ctx = PackageContext {
-            package_base: None,
             name: "test-pkg".into(),
             metadata: None,
             pkgbuild_content: Some(content),
@@ -150,7 +149,6 @@ mod tests {
     fn ignores_comments() {
         let content = "# source from https://pastebin.com/abc\nsource=('https://github.com/user/repo.tar.gz')\n";
         let ctx = PackageContext {
-            package_base: None,
             name: "test-pkg".into(),
             metadata: None,
             pkgbuild_content: Some(content.into()),

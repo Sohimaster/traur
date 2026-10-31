@@ -238,12 +238,7 @@ fn cmd_scan_all_installed(jobs: usize, json: bool, verbose: bool, flagged_only: 
                     .unwrap_or_default();
 
                 match clone_with_retry(name, meta, maint_pkgs) {
-                    Ok(ctx) => {
-                        let scan = coordinator::run_analysis_with_config(&ctx, &config);
-                        let pkg_base = ctx.package_base.as_deref().unwrap_or(name);
-                        let _ = shared::cache::clean_git_cache(Some(pkg_base));
-                        Ok(scan)
-                    }
+                    Ok(ctx) => Ok(coordinator::run_analysis_with_config(&ctx, &config)),
                     Err(e) => Err(e),
                 }
             } else {

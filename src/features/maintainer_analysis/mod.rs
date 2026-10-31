@@ -104,7 +104,6 @@ mod tests {
         let ts = now();
         let pkg = make_pkg("evil", ts - 86400); // 1 day old
         let ctx = PackageContext {
-            package_base: None,
             name: "evil".into(),
             metadata: Some(pkg.clone()),
             pkgbuild_content: None,
@@ -125,7 +124,6 @@ mod tests {
         let ts = now();
         let pkg = make_pkg("old-pkg", ts - 90 * 86400); // 90 days old
         let ctx = PackageContext {
-            package_base: None,
             name: "old-pkg".into(),
             metadata: Some(pkg.clone()),
             pkgbuild_content: None,
@@ -150,7 +148,6 @@ mod tests {
             make_pkg("pkg3", ts - 10800),
         ];
         let ctx = PackageContext {
-            package_base: None,
             name: "pkg1".into(),
             metadata: Some(pkgs[0].clone()),
             pkgbuild_content: None,

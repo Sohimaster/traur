@@ -14,9 +14,6 @@ pub fn scan_package(package_name: &str, json: bool, verbose: bool) -> Result<Tie
         output::print_text(&result, verbose);
     }
 
-    let pkg_base = ctx.package_base.as_deref().unwrap_or(package_name);
-    let _ = crate::shared::cache::clean_git_cache(Some(pkg_base));
-
     Ok(result.tier)
 }
 
@@ -76,7 +73,6 @@ pub fn build_context(package_name: &str) -> Result<PackageContext, String> {
 
     Ok(PackageContext {
         name: package_name.to_string(),
-        package_base: Some(package_base.to_string()),
         metadata: Some(metadata),
         pkgbuild_content,
         install_script_content,
@@ -135,7 +131,6 @@ pub fn build_context_prefetched(
 
     Ok(PackageContext {
         name: package_name.to_string(),
-        package_base: Some(package_base.to_string()),
         metadata: Some(metadata),
         pkgbuild_content: pkgbuild,
         install_script_content: install,
@@ -152,7 +147,6 @@ pub fn build_context_prefetched(
 pub fn scan_pkgbuild(name: &str, pkgbuild_content: &str) -> ScanResult {
     let ctx = PackageContext {
         name: name.to_string(),
-        package_base: None,
         metadata: None,
         pkgbuild_content: Some(pkgbuild_content.to_string()),
         install_script_content: None,

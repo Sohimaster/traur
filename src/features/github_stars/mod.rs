@@ -59,7 +59,6 @@ mod tests {
 
     fn analyze_stars(stars: Option<u32>, not_found: bool) -> Vec<String> {
         let ctx = PackageContext {
-            package_base: None,
             name: "test".into(),
             metadata: None,
             pkgbuild_content: None,

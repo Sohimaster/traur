@@ -212,7 +212,6 @@ mod tests {
 
     fn analyze(new: &str, old: &str) -> Vec<String> {
         let ctx = PackageContext {
-            package_base: None,
             name: "test".into(),
             metadata: None,
             pkgbuild_content: Some(new.to_string()),
@@ -234,7 +233,6 @@ mod tests {
     #[test]
     fn no_prior_pkgbuild() {
         let ctx = PackageContext {
-            package_base: None,
             name: "test".into(),
             metadata: None,
             pkgbuild_content: Some("pkgname=test".into()),

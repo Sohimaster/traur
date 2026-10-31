@@ -206,7 +206,6 @@ mod tests {
 
     fn analyze(name: &str, url: Option<&str>, pkgbuild: &str) -> Vec<Signal> {
         let ctx = PackageContext {
-            package_base: None,
             name: name.into(),
             metadata: Some(make_pkg(url)),
             pkgbuild_content: Some(pkgbuild.into()),

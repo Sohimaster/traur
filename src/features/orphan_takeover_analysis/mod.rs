@@ -123,7 +123,6 @@ mod tests {
     fn same_submitter_maintainer() {
         let ts = now();
         let ctx = PackageContext {
-            package_base: None,
             name: "pkg".into(),
             metadata: Some(make_pkg("alice", Some("alice"), ts - 180 * 86400)),
             pkgbuild_content: None,
@@ -142,7 +141,6 @@ mod tests {
     fn no_submitter_field() {
         let ts = now();
         let ctx = PackageContext {
-            package_base: None,
             name: "pkg".into(),
             metadata: Some(make_pkg("alice", None, ts - 180 * 86400)),
             pkgbuild_content: None,
@@ -161,7 +159,6 @@ mod tests {
     fn submitter_changed() {
         let ts = now();
         let ctx = PackageContext {
-            package_base: None,
             name: "pkg".into(),
             metadata: Some(make_pkg("bob", Some("alice"), ts - 180 * 86400)),
             pkgbuild_content: None,
@@ -182,7 +179,6 @@ mod tests {
     fn orphan_takeover_composite() {
         let ts = now();
         let ctx = PackageContext {
-            package_base: None,
             name: "pkg".into(),
             metadata: Some(make_pkg("attacker", Some("original"), ts - 365 * 86400)),
             pkgbuild_content: None,
@@ -206,7 +202,6 @@ mod tests {
     fn new_package_no_composite() {
         let ts = now();
         let ctx = PackageContext {
-            package_base: None,
             name: "pkg".into(),
             metadata: Some(make_pkg("bob", Some("alice"), ts - 30 * 86400)),
             pkgbuild_content: None,
@@ -230,7 +225,6 @@ mod tests {
     fn same_git_author_no_composite() {
         let ts = now();
         let ctx = PackageContext {
-            package_base: None,
             name: "pkg".into(),
             metadata: Some(make_pkg("bob", Some("alice"), ts - 365 * 86400)),
             pkgbuild_content: None,

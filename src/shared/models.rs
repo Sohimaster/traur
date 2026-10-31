@@ -3,7 +3,6 @@ use serde::Deserialize;
 /// All data a feature needs to run its analysis.
 pub struct PackageContext {
     pub name: String,
-    pub package_base: Option<String>,
     pub metadata: Option<AurPackage>,
     pub pkgbuild_content: Option<String>,
     pub install_script_content: Option<String>,

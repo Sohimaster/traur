@@ -168,7 +168,6 @@ mod tests {
 
     fn analyze(name: &str, content: &str) -> Vec<String> {
         let ctx = PackageContext {
-            package_base: None,
             name: name.into(),
             metadata: None,
             pkgbuild_content: Some(content.into()),
@@ -229,7 +228,6 @@ mod tests {
     #[test]
     fn checksum_mismatch_points_and_wording() {
         let ctx = PackageContext {
-            package_base: None,
             name: "test-pkg".into(),
             metadata: None,
             pkgbuild_content: Some("source=('a.tar.gz' 'b.tar.gz')\nsha256sums=('abc123')\n".into()),
@@ -284,7 +282,6 @@ mod tests {
     fn mismatch_emits_only_one_signal() {
         // Multiple arch suffixes with mismatches should only emit one P-CHECKSUM-MISMATCH
         let ctx = PackageContext {
-            package_base: None,
             name: "test-bin".into(),
             metadata: None,
             pkgbuild_content: Some("source_x86_64=('a' 'b' 'c')\nsha256sums_x86_64=('h1')\nsource_aarch64=('d' 'e' 'f')\nsha256sums_aarch64=('h2')\n".into()),

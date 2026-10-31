@@ -192,7 +192,6 @@ mod tests {
 
     fn analyze(name: &str) -> Vec<String> {
         let ctx = PackageContext {
-            package_base: None,
             name: name.into(),
             metadata: None,
             pkgbuild_content: None,
@@ -210,7 +209,6 @@ mod tests {
     fn analyze_with_votes(name: &str, votes: u32) -> Vec<String> {
         use crate::shared::models::AurPackage;
         let ctx = PackageContext {
-            package_base: None,
             name: name.into(),
             metadata: Some(AurPackage {
                 name: name.into(),
