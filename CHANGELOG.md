@@ -1,5 +1,78 @@
 # Changelog
 
+## 0.6.0
+
+This release changes how signals are scored. It closes two silent bypasses, removes
+the false positives reported against 0.5.0, and adds the measurement harness those
+changes are verified against.
+
+### Changed — score semantics (`schema_version: 2`)
+
+- Signals now carry a **role**. `Fact` signals describe a package's declarations and
+  normal AUR packaging conventions and no longer add risk; only `Capability`,
+  `Composition` and override gates participate. `score`, `tier`, `signals[].id` and
+  `override_gate_fired` remain stable, and the JSON gains `schema_version`, `status`
+  and `reason`. Numeric scores move for most packages: a normal package that used to
+  score 77 for shipping a systemd unit now scores 100.
+- The report marks facts with `--` and says so, so a lifecycle convention is never
+  read as a finding.
+
+### Added
+
+- **Local directory scans** (`traur scan --dir`, and `--pkgbuild` now analyses its
+  directory). Committed `source=()` files and the `.install` script pacman executes
+  are analysed, with reads confined to the package directory and size caps.
+- **Composition detection**: `SA-PIPE-DOWNLOAD-EXEC`, `SA-PIPE-DECODE-EXEC` and
+  `SA-EXFIL-PIPE` catch a download or decode flowing into an interpreter, and a
+  credential store leaving over the network — including inside `$(...)`, which the
+  line-oriented patterns missed.
+- **`eval` classification**: `eval "$pkgver"` is a fact; `eval "$(curl … | base64 -d
+  | bash)"` gates. `P-EVAL-VAR` is retained at zero points for compatibility.
+- **`P-INSTALL-UNRESOLVED`**: an `install=` naming a file that cannot be read is now
+  reported instead of silently analysing nothing.
+- **Inconclusive scans**: missing input yields `UNSAFE-TO-CONCLUDE` (`"tier":
+  "Unknown"`) with a reason, never `TRUSTED` and never `SUSPICIOUS`. The hook offers
+  allow once, allow for this session, or stop; a session allow is root-owned, applies
+  only to inconclusive scans, and expires on the next successful AUR fetch or reboot.
+- **Offline corpus harness** (`tests/corpus/`, `tests/corpus_cases.rs`) with 46 real
+  AUR packages and 7 incident-derived samples, plus `tests/bypass_regressions.rs`.
+
+### Fixed
+
+- **Credential exfiltration from `.install` scripts scored 89/100 TRUSTED.** The
+  install script was only resolved from a literal `install=` prefix; spaced, variable
+  and split-package forms were missed, and a failed read returned nothing. It is now
+  resolved the way makepkg does, and the pipeline gates.
+- **A committed `source=()` file containing `curl … | base64 -d | bash` scored
+  100/100 TRUSTED.** Local sources are now analysed.
+- **`P-SYSTEMD-CREATE` fired on `install -Dm644 foo.service "$pkgdir/usr/lib/systemd/"`
+  (#13 class).** Packaging a unit is a fact; `llama.cpp-vulkan`, `dotool`,
+  `voxtype-bin` and `whisper.cpp-vulkan` no longer score SKETCHY for it.
+- **`B-TYPOSQUAT` fired on legitimate variants** (`slack-desktop-wayland`, `vim-git`,
+  `proton-ge-custom-bin`). Recognised variant suffixes are no longer treated as
+  impersonation, and a test that asserted the old behaviour was corrected.
+- **`P-CHECKSUM-MISMATCH` counted comment lines as checksums** (`voxtype-bin`
+  reported 10 sources against 145 "checksums").
+- **Masking was private to one feature**, so the checksum and header-comment fixes
+  (#27, #11, #12) kept recurring on other surfaces. All features now read one
+  normalized view, and the checksum regex that stopped at the first `)` was replaced
+  by region-based span masking.
+- **`G-DOWNLOAD-NODE` matched declared build tooling** (`pnpm exec`).
+- **`P-NPM-INSTALL-BUILDTIME` is now a conditional fact** when the toolchain is
+  declared in `makedepends` and no remote tarball is present; the Atomic Arch
+  coverage is unchanged.
+- **Partial AUR outages silently skipped packages**: a failed batch is now `Unknown`,
+  not "not on AUR".
+
+### Known limitations
+
+- A remote `source=()` file that has not been downloaded yet is not analysed. Absence
+  is reported as "not analysed", never as clean.
+- `-git` packages have no checksum to verify, so provenance for them reduces to the
+  declared upstream URL.
+- The malicious corpus is small and incident-derived; it is a recall floor, not a
+  benchmark.
+
 ## 0.5.0
 
 ### Fixed

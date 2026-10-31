@@ -8,3 +8,6 @@ pkg/pkg/
 pkg/src/
 pkg/*.pkg.tar.zst
 pkg/*.tar.gz
+
+# local agent state (not part of the project)
+.mars/

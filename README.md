@@ -50,7 +50,21 @@ and MALICIOUS ones require an explicit `y`.
 
 ## How it works
 
-12 independent features emit scored signals per package:
+16 independent features emit scored signals per package. Each signal carries a
+**role** that decides whether it can lower the score:
+
+- **Fact** — a declaration or a normal AUR packaging convention (shipping a
+  systemd unit, installing a pacman hook, `SKIP` checksums on a `-bin` package).
+  Reported, never scored. This is why normal packages stop being flagged.
+- **Capability** — the code can do something (download, decode, execute).
+- **Composition** — linked capabilities inside one region, such as reading
+  `~/.ssh` and sending it out, or downloading, decoding and executing. May gate.
+- **Provenance** — metadata, git and GitHub facts. Suppressors only.
+
+Only compositions and the audited override list can force MALICIOUS. That split
+is what lets traur catch real payloads without treating packaging conventions as
+evidence: `eval "$pkgver"` is a fact because there is no command substitution,
+while `eval "$(curl ... | base64 -d | bash)"` is a composition.
 
 | Feature | What it checks |
 |---------|---------------|
@@ -66,6 +80,41 @@ and MALICIOUS ones require an explicit `y`.
 | Shell analysis | Beyond-regex obfuscation (var concat, indirect exec, data blobs) |
 | GTFOBins analysis | Legitimate binary abuse |
 | Bin source verification | -bin package source domain vs upstream URL mismatch |
+| Eval analysis | Classifies the `eval` argument: expansion vs command substitution |
+| Pipe-chain analysis | Download/decode into an interpreter, credential exfiltration |
+| Malicious list | Published AUR compromise list, with a stale-cache fallback |
+| GitHub stars | Upstream repository existence and popularity |
+| AUR comments | Security-relevant reports in package comments |
+| PKGBUILD diff | Changes against the previous version, adoption-aware |
+
+## Local scans
+
+`traur scan --dir <path>` analyses a package directory as a whole: the PKGBUILD,
+the `.install` script pacman will execute, and committed `source=()` files, which
+land in `$srcdir` and can be `source`d at build time. `--pkgbuild <file>` does the
+same for the file's directory. Reads are confined to the package directory, and
+anything not analysed is reported rather than silently skipped.
+
+## Inconclusive scans
+
+When input is missing — the AUR is unreachable, a PKGBUILD cannot be read — traur
+reports `UNSAFE-TO-CONCLUDE` (`"tier": "Unknown"`), not a verdict. It is not
+`TRUSTED` (nothing was verified) and not `SUSPICIOUS` (nothing was judged). The
+hook offers three answers: allow once, allow for this session, or stop. A session
+allow applies only to inconclusive scans, is stored root-owned, and expires on the
+next successful AUR fetch or reboot; `TRAUR_ALLOW_OFFLINE=1` is the unattended form.
+A scored MALICIOUS verdict in the same transaction still blocks.
+
+## Testing
+
+```bash
+cargo test --locked
+```
+
+The suite runs offline. `tests/corpus/` holds real AUR packages (the
+false-positive budget) and incident-derived malicious samples (the recall floor);
+`tests/corpus_cases.rs` asserts policy against them, and
+`tests/bypass_regressions.rs` pins the behaviours that were previously silent.
 
 ## Detection coverage
 
