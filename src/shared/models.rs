@@ -1,6 +1,8 @@
+use crate::shared::local_scan::LocalSource;
 use serde::Deserialize;
 
 /// All data a feature needs to run its analysis.
+#[derive(Debug)]
 pub struct PackageContext {
     pub name: String,
     pub metadata: Option<AurPackage>,
@@ -12,6 +14,36 @@ pub struct PackageContext {
     pub github_stars: Option<u32>,
     pub github_not_found: bool,
     pub aur_comments: Vec<String>,
+    /// Committed `source=()` files, read from disk when scanning a directory.
+    /// Empty for a clone that has not downloaded sources yet: absence means
+    /// "not analysed", never "clean".
+    pub local_sources: Vec<LocalSource>,
+    /// Directory the PKGBUILD was read from, for provenance in reports.
+    pub source_path: Option<std::path::PathBuf>,
+    /// Why the inputs are incomplete, if they are. When non-empty the scan
+    /// reports `Unknown` rather than a verdict: an unreadable PKGBUILD or a
+    /// missing install script means nothing was verified.
+    pub incomplete: Vec<String>,
+}
+
+impl Default for PackageContext {
+    fn default() -> Self {
+        PackageContext {
+            name: String::new(),
+            metadata: None,
+            pkgbuild_content: None,
+            install_script_content: None,
+            prior_pkgbuild_content: None,
+            git_log: Vec::new(),
+            maintainer_packages: Vec::new(),
+            github_stars: None,
+            github_not_found: false,
+            aur_comments: Vec::new(),
+            local_sources: vec![],
+            source_path: None,
+            incomplete: vec![],
+        }
+    }
 }
 
 /// Package metadata from AUR RPC API v5.
