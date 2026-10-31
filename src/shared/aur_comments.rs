@@ -2,7 +2,7 @@ use regex::Regex;
 use std::sync::LazyLock;
 
 static COMMENT_RE: LazyLock<Regex> = LazyLock::new(|| {
-    Regex::new(r#"<div class="article-content"[^>]*>([\s\S]*?)</div>"#).unwrap()
+    Regex::new(r#"<div[^>]*class="article-content"[^>]*>([\s\S]*?)</div>"#).unwrap()
 });
 
 static HTML_TAG_RE: LazyLock<Regex> = LazyLock::new(|| {
@@ -78,6 +78,20 @@ mod tests {
     #[test]
     fn handles_empty_html() {
         assert!(extract_comments("").is_empty());
+    }
+
+    #[test]
+    fn extracts_comments_when_id_precedes_class() {
+        let html = r#"
+        <div id="comment-12345-content" class="article-content">
+            <div>
+                <p>This package contains malware!</p>
+            </div>
+        </div>
+        "#;
+        let comments = extract_comments(html);
+        assert_eq!(comments.len(), 1);
+        assert!(comments[0].contains("malware"));
     }
 
     #[test]
