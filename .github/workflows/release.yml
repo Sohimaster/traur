@@ -67,19 +67,14 @@ jobs:
             -C "$(pwd)/data" patterns.toml \
             -C "$(pwd)" LICENSE
 
-          # The AUR -bin package expects exactly these five flat entries.
-          expected="LICENSE
-          patterns.toml
-          traur
-          traur-hook
-          traur.hook
-          traur-scan.service
-          traur-scan.timer
-          makepkg-wrapper.sh"
-          actual="$(tar tzf "$archive" | sort)"
-          if [ "$(echo "$actual" | tr -d '[:space:]')" != "$(echo "$expected" | tr -d '[:space:]')" ]; then
-            echo "unexpected tarball contents:" >&2
-            echo "$actual" >&2
+          # The AUR -bin package expects exactly these flat entries.
+          printf '%s\n' \
+            LICENSE makepkg-wrapper.sh patterns.toml traur traur-hook \
+            traur-scan.service traur-scan.timer traur.hook \
+            | sort > /tmp/expected.txt
+          tar tzf "$archive" | sort > /tmp/actual.txt
+          if ! diff -u /tmp/expected.txt /tmp/actual.txt; then
+            echo "unexpected tarball contents" >&2
             exit 1
           fi
 
