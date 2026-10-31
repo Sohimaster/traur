@@ -159,7 +159,48 @@ fn count_array_entries(content: &str, array_name: &str) -> usize {
     if DYNAMIC_BASH_RE.is_match(body) {
         return 0;
     }
-    TOKEN_RE.find_iter(body).count()
+    count_bash_array_words(body)
+}
+
+/// Count the words in a bash array body.
+///
+/// `TOKEN_RE` alone splits `"name"::"url"` (and `name::url`) into three
+/// tokens, which made packages using the `source=("$file"::"$url")` form
+/// report a bogus count mismatch. An `a::b` spec is a single entry, so
+/// adjacent tokens joined by `::` are merged before counting.
+fn count_bash_array_words(body: &str) -> usize {
+    // A quoted segment, a `::` joiner (its own token when between quotes), or
+    // a bare word.
+    let joiner = "::";
+    let mut count = 0usize;
+    // Set when the previous token ended a word that the next one continues.
+    let mut continuing = false;
+
+    for m in TOKEN_RE.find_iter(body) {
+        let token = m.as_str();
+
+        if token == joiner {
+            // `"a" :: "b"` - the entry continues, nothing counted yet.
+            continuing = true;
+            continue;
+        }
+
+        if token.ends_with(joiner) {
+            // `a::b` already whole, or `a::"b"` where the url is separate.
+            if !continuing {
+                count += 1;
+            }
+            continuing = true;
+            continue;
+        }
+
+        if !continuing {
+            count += 1;
+        }
+        continuing = false;
+    }
+
+    count
 }
 
 #[cfg(test)]
@@ -298,3 +339,50 @@ mod tests {
         assert_eq!(mismatch_count, 1, "should emit exactly one mismatch signal, got {mismatch_count}");
     }
 }
+
+#[cfg(test)]
+mod word_count_tests {
+    use super::*;
+
+    #[test]
+    fn counts_plain_quoted_entries() {
+        assert_eq!(count_bash_array_words("'a.tar.gz' 'b.patch' 'SKIP'"), 3);
+        assert_eq!(count_bash_array_words("\"a\" \"b\""), 2);
+    }
+
+    #[test]
+    fn counts_unquoted_entries() {
+        assert_eq!(count_bash_array_words("a.tar.gz b.patch"), 2);
+    }
+
+    #[test]
+    fn name_url_spec_is_one_entry() {
+        // flutter-bin: source=("$_pkgsrc.$_pkgext"::"$_url_dl/...")
+        assert_eq!(count_bash_array_words(r#""file.tar.xz"::"https://x/f.tar.xz""#), 1);
+        assert_eq!(count_bash_array_words("file.tar.xz::https://x/f.tar.xz"), 1);
+        assert_eq!(count_bash_array_words(r#"a::b 'c'::"d""#), 2);
+    }
+
+    #[test]
+    fn flutter_bin_shape_no_mismatch() {
+        let content = "pkgname=flutter-bin\nsource=(\"$_pkgsrc.$_pkgext\"::\"$_url_dl/flutter_linux_$pkgver-stable.$_pkgext\")\nmd5sums=('241d6028501954c409ec66afed158def')\n";
+        let ctx = PackageContext {
+            name: "flutter-bin".into(),
+            metadata: None,
+            pkgbuild_content: Some(content.into()),
+            install_script_content: None,
+            prior_pkgbuild_content: None,
+            git_log: vec![],
+            maintainer_packages: vec![],
+            github_stars: None,
+            github_not_found: false,
+            aur_comments: vec![],
+        };
+        let ids: Vec<String> = ChecksumAnalysis.analyze(&ctx).iter().map(|s| s.id.clone()).collect();
+        assert!(
+            !ids.iter().any(|s| s == "P-CHECKSUM-MISMATCH"),
+            "name::url source must count as one entry, got: {ids:?}"
+        );
+    }
+}
+

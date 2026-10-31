@@ -522,7 +522,7 @@ fn analyze_heredoc_entropy(content: &str) -> Vec<Signal> {
 
             if body.len() > 200 {
                 let entropy = shannon_entropy(&body);
-                if entropy > 5.0 {
+                if entropy > 5.0 && looks_like_encoded_blob(&body) {
                     return vec![Signal {
                         id: "SA-HIGH-ENTROPY-HEREDOC".to_string(),
                         category: SignalCategory::Pkgbuild,
@@ -542,6 +542,31 @@ fn analyze_heredoc_entropy(content: &str) -> Vec<Signal> {
     }
 
     Vec::new()
+}
+
+/// Whether a heredoc body looks like machine-encoded data rather than code.
+///
+/// Raw byte entropy is high for any text that uses many distinct ASCII bytes,
+/// so generated shell scripts (legitimate heredoc output) score just as high as
+/// real payloads - this was the flutter-bin false positive. Encoded data has
+/// almost no whitespace and is dense in symbols and digits, which ordinary
+/// code is not.
+fn looks_like_encoded_blob(body: &str) -> bool {
+    let total = body.chars().count();
+    if total == 0 {
+        return false;
+    }
+    let whitespace = body.chars().filter(|c| c.is_whitespace()).count();
+    let literal = body
+        .chars()
+        .filter(|c| c.is_ascii_alphanumeric() || *c == '+' || *c == '/' || *c == '=')
+        .count();
+
+    let whitespace_ratio = whitespace as f64 / total as f64;
+    let literal_ratio = literal as f64 / total as f64;
+
+    // Encoded blobs: under 5% whitespace and over 85% base64-like characters.
+    whitespace_ratio < 0.05 && literal_ratio > 0.85
 }
 
 /// Calculate Shannon entropy in bits per byte.
@@ -792,12 +817,31 @@ mod tests {
 
     #[test]
     fn high_entropy_heredoc() {
-        // Generate high-entropy content (diverse byte values)
-        let body: String = (0..300)
-            .map(|i| (33 + ((i * 7 + 13) % 94)) as u8 as char)
+        // A base64 payload: dense, no whitespace, high byte entropy.
+        let body: String = (0..400)
+            .map(|i| {
+                let alphabet = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+                alphabet[(i * 7 + 13) % alphabet.len()] as char
+            })
             .collect();
-        let ids = analyze(&format!("cat <<EOF\n{body}\nEOF"));
+        let ids = analyze(&format!("cat <<EOF > /tmp/x\n{body}\nEOF\nbase64 -d /tmp/x | bash"));
         assert!(has(&ids, "SA-HIGH-ENTROPY-HEREDOC"));
+    }
+
+    #[test]
+    fn generated_shell_script_heredoc_no_signal() {
+        // flutter-bin #13: heredocs that emit bash wrappers are high byte
+        // entropy but are ordinary code, not encoded data.
+        let body = "#!/usr/bin/env bash
+
+source /opt/flutter/bin/aur_init.sh
+
+if ! grep -q '/usr/bin' <<< \"$(which dart)\"; then
+  exec dart \"$@\"
+fi
+";
+        let ids = analyze(&format!("cat > flutter_dart.sh << 'END'\n{}\nEND", body.repeat(4)));
+        assert!(!has(&ids, "SA-HIGH-ENTROPY-HEREDOC"), "got: {ids:?}");
     }
 
     #[test]
