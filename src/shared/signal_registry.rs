@@ -93,6 +93,7 @@ fn hardcoded_signals() -> Vec<SignalDef> {
         ("P-SKIP-ALL", Pkgbuild, 25, "All checksums are SKIP (no integrity verification)", false),
         ("P-WEAK-CHECKSUMS", Pkgbuild, 10, "Using weak checksums (md5/sha1) without stronger alternative", false),
         ("P-CHECKSUM-MISMATCH", Pkgbuild, 25, "Source count != checksum count", false),
+        ("B-MALICIOUS-LIST", Behavioral, 100, "Package is on the public list of AUR packages compromised in the malware incident", true),
         // shell_analysis
         ("SA-VAR-CONCAT-EXEC", Pkgbuild, 85, "Variable concatenation resolves to download-and-execute", true),
         ("SA-QUOTE-SPLIT-EXEC", Pkgbuild, 85, "Quote splitting resolves to download-and-execute", true),
