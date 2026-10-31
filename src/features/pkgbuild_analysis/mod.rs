@@ -41,16 +41,28 @@ impl Feature for PkgbuildAnalysis {
         };
 
         let masked = mask_checksum_arrays(content);
+        // Patterns are literal regexes over source text, so quote removal is
+        // needed to see through `cu""rl` / `c"url"` splitting. The original
+        // text is kept because quote *content* is data some patterns match
+        // (e.g. Python code passed to `python3 -c '...'`).
+        let normalized = crate::shared::shell_normalize::strip_quotes(&masked);
         let compiled = patterns::compiled_patterns();
         let mut signals = Vec::new();
 
         for pat in compiled {
-            if pat.regex.is_match(&masked) {
-                let matched_line = masked
+            let hit = pat.regex.is_match(&masked) || pat.regex.is_match(&normalized);
+            if hit {
+                let matched_line = content
                     .lines()
-                    .zip(content.lines())
-                    .find(|(masked_line, _)| pat.regex.is_match(masked_line))
-                    .map(|(_, original)| original.trim().to_string());
+                    .find(|line| pat.regex.is_match(line))
+                    .or_else(|| {
+                        normalized
+                            .lines()
+                            .zip(content.lines())
+                            .find(|(normalized_line, _)| pat.regex.is_match(normalized_line))
+                            .map(|(_, original)| original)
+                    })
+                    .map(|line| line.trim().to_string());
                 signals.push(Signal {
                     id: pat.id.clone(),
                     category: SignalCategory::Pkgbuild,

