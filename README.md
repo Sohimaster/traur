@@ -35,6 +35,19 @@ SUSPICIOUS or MALICIOUS package is found):
 traur scan --flagged-only --json
 ```
 
+The ALPM hook runs at `PreTransaction`, which is **after** `makepkg` has executed
+`build()`. For a payload in `build()`, the code has already run by then. To scan
+before the build starts, install the wrapper from issue #19/#16:
+
+```bash
+sudo install -Dm755 /usr/share/traur/makepkg-wrapper.sh /usr/local/bin/makepkg
+```
+
+It only acts inside yay/paru build caches, passes `--printsrcinfo`,
+`--packagelist` and other query invocations straight through, and leaves local
+`makepkg` runs untouched. Trusted packages build without prompting; SUSPICIOUS
+and MALICIOUS ones require an explicit `y`.
+
 ## How it works
 
 12 independent features emit scored signals per package:

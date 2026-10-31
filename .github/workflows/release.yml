@@ -63,7 +63,7 @@ jobs:
 
           tar czf "$archive" \
             -C "$(pwd)/target/release" traur traur-hook \
-            -C "$(pwd)/hook" traur.hook traur-scan.service traur-scan.timer \
+            -C "$(pwd)/hook" traur.hook traur-scan.service traur-scan.timer makepkg-wrapper.sh \
             -C "$(pwd)/data" patterns.toml \
             -C "$(pwd)" LICENSE
 
@@ -74,7 +74,8 @@ jobs:
           traur-hook
           traur.hook
           traur-scan.service
-          traur-scan.timer"
+          traur-scan.timer
+          makepkg-wrapper.sh"
           actual="$(tar tzf "$archive" | sort)"
           if [ "$(echo "$actual" | tr -d '[:space:]')" != "$(echo "$expected" | tr -d '[:space:]')" ]; then
             echo "unexpected tarball contents:" >&2

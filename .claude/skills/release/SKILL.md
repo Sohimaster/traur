@@ -64,12 +64,12 @@ Create a flat tarball (no directory prefix) with all release artifacts:
 ```bash
 tar czf traur-$ARGUMENTS-x86_64.tar.gz \
   -C target/release traur traur-hook \
-  -C ../../hook traur.hook traur-scan.service traur-scan.timer \
+  -C ../../hook traur.hook traur-scan.service traur-scan.timer makepkg-wrapper.sh \
   -C ../data patterns.toml \
   -C .. LICENSE
 ```
 
-Verify contents — must list exactly: `traur`, `traur-hook`, `traur.hook`, `traur-scan.service`, `traur-scan.timer`, `patterns.toml`, `LICENSE`
+Verify contents — must list exactly: `traur`, `traur-hook`, `traur.hook`, `traur-scan.service`, `traur-scan.timer`, `makepkg-wrapper.sh`, `patterns.toml`, `LICENSE`
 
 ```bash
 tar tzf traur-$ARGUMENTS-x86_64.tar.gz

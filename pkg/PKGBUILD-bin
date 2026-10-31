@@ -21,6 +21,7 @@ package() {
     install -Dm0644 traur.hook "$pkgdir/usr/share/libalpm/hooks/traur.hook"
     install -Dm0644 traur-scan.service "$pkgdir/usr/lib/systemd/system/traur-scan.service"
     install -Dm0644 traur-scan.timer "$pkgdir/usr/lib/systemd/system/traur-scan.timer"
+    install -Dm0755 makepkg-wrapper.sh "$pkgdir/usr/share/traur/makepkg-wrapper.sh"
     install -Dm0644 patterns.toml "$pkgdir/usr/share/traur/patterns.toml"
     install -Dm0644 LICENSE "$pkgdir/usr/share/licenses/$pkgname/LICENSE"
 }
