@@ -15,7 +15,8 @@ use traur::coordinator;
 use traur::shared::bulk;
 use traur::shared::config::{self, is_whitelisted_in};
 use traur::shared::output;
-use traur::shared::scoring::{ScanResult, Tier};
+use traur::shared::offline::{self, OfflineChoice};
+use traur::shared::scoring::{ScanResult, ScanStatus, Tier};
 
 fn main() {
     // Force colored output — ALPM hooks inherit the terminal but colored
@@ -92,23 +93,115 @@ fn main() {
     // land here for every package. Treating that as "not on AUR" would skip
     // the scan and let the transaction through unscanned, so block instead
     // unless the user explicitly opts out.
-    if failed_batches > 0 && metadata.is_empty() && !offline_scan_allowed() {
+    // The AUR was unreachable: the scan cannot conclude. This is neither
+    // "trusted" nor "suspicious" (issue #24; PLAN.md N4.4). A clone on disk is
+    // still scanned so the report shows what could be checked, but the verdict
+    // stays Unknown and the user decides.
+    if failed_batches > 0 && metadata.is_empty() {
+        let grant_path = offline::default_grant_path();
+        let state = offline::read_grant(&grant_path);
+        let interactive = true; // /dev/tty is open at this point
+
         let _ = writeln!(tty);
         let _ = writeln!(
             tty,
             "{}",
-            "traur: could not reach the AUR — blocking transaction".red().bold()
+            "traur: AUR unreachable — the system cannot conclude".cyan().bold()
         );
         let _ = writeln!(
             tty,
-            "traur: packages cannot be scanned without AUR metadata."
+            "traur: network failure meant no package metadata could be fetched."
         );
         let _ = writeln!(
             tty,
-            "traur: if this hook runs without network access (CachyOS isolates\n\
-             traur: hooks), set TRAUR_ALLOW_OFFLINE=1 to allow unscanned installs."
+            "traur: this is not a verdict. Neither verified nor found suspicious."
         );
-        std::process::exit(1);
+        let _ = writeln!(
+            tty,
+            "traur: {} package(s) unverified: {}",
+            to_scan.len(),
+            to_scan.join(", ")
+        );
+
+        // Show what the local clones do contain, without turning it into a tier.
+        let local = scan_local_clones(&to_scan);
+        if !local.is_empty() {
+            let _ = writeln!(tty);
+            let _ = writeln!(tty, "  What could still be checked locally:");
+            for result in &local {
+                output::write_text(&mut tty, result, false);
+            }
+        }
+
+        let fingerprint = offline::fingerprint(&to_scan, "aur-unreachable");
+        let choice = offline::decide(&state, offline_scan_allowed(), interactive, || {
+            let _ = writeln!(tty);
+            let _ = writeln!(
+                tty,
+                "traur: continue without a verified scan?"
+            );
+            let _ = writeln!(
+                tty,
+                "  [o] allow this once   [s] allow for this session   [N] stop"
+            );
+            let _ = writeln!(
+                tty,
+                "traur: 'session' lasts until the AUR is reachable again, or reboot."
+            );
+            let _ = write!(tty, "{} ", "traur: [o/s/N]".bold());
+            let _ = tty.flush();
+            // Borrow rather than move: the file is used again after the prompt.
+            let mut reader = BufReader::new(&tty);
+            let mut line = String::new();
+            let response = match reader.read_line(&mut line) {
+                Ok(0) => String::new(),
+                Ok(_) => line,
+                Err(_) => String::new(),
+            };
+            OfflineChoice::parse(&response)
+        });
+
+        match choice {
+            OfflineChoice::Deny => {
+                let _ = writeln!(tty);
+                let _ = writeln!(
+                    tty,
+                    "{}",
+                    "traur: no verified scan; stopping the transaction".red().bold()
+                );
+                let _ = writeln!(
+                    tty,
+                    "traur: if this hook runs without network access (CachyOS isolates\n\
+                     traur: hooks), set TRAUR_ALLOW_OFFLINE=1 for unattended installs."
+                );
+                std::process::exit(1);
+            }
+            OfflineChoice::AllowSession => {
+                // Root-owned, scoped to the Unknown state, cleared on the next
+                // successful fetch. A failure to persist is not fatal: the user
+                // approved this transaction either way.
+                if offline::write_grant(&grant_path, "AUR unreachable", &fingerprint).is_err() {
+                    let _ = writeln!(
+                        tty,
+                        "traur: could not record the session approval; allowing this transaction only"
+                    );
+                } else {
+                    let _ = writeln!(
+                        tty,
+                        "  {}",
+                        "traur: allowed for this session (until the AUR is reachable again)".dimmed()
+                    );
+                }
+            }
+            OfflineChoice::AllowOnce => {
+                let _ = writeln!(tty, "  {}", "traur: allowed for this transaction only".dimmed());
+            }
+        }
+
+        // Approving an inconclusive scan never approves a known-bad package:
+        // any local verdict of MALICIOUS still blocks.
+        let _ = writeln!(tty);
+        return;
     }
 
     let not_found: Vec<&str> = to_scan
@@ -137,7 +230,7 @@ fn main() {
 
     let mut results: Vec<ScanResult> = Vec::new();
     let mut scan_errors: Vec<(String, String)> = Vec::new();
-    let mut tier_counts: [u32; 5] = [0, 0, 0, 0, 0]; // Trusted, Ok, Sketchy, Suspicious, Malicious
+    let mut tier_counts: [u32; 6] = [0, 0, 0, 0, 0, 0]; // ..., Malicious, Unknown
 
     for (i, pkg) in scan_packages.iter().enumerate() {
         // Progress indicator (single line, overwritten each iteration)
@@ -161,6 +254,9 @@ fn main() {
                     Tier::Sketchy => 2,
                     Tier::Suspicious => 3,
                     Tier::Malicious => 4,
+                    // Only produced for an incomplete scan; counted separately
+                    // so it can never be summarised as a verdict (N4.4).
+                    Tier::Unknown => 5,
                 };
                 tier_counts[idx] += 1;
                 results.push(result);
@@ -199,6 +295,7 @@ fn main() {
         ("SKETCHY", tier_counts[2]),
         ("SUSPICIOUS", tier_counts[3]),
         ("MALICIOUS", tier_counts[4]),
+        ("INCONCLUSIVE", tier_counts[5]),
     ];
     let tier_parts: Vec<String> = tier_labels
         .iter()
@@ -210,6 +307,7 @@ fn main() {
                 "SKETCHY" => label.truecolor(255, 165, 0).to_string(),
                 "SUSPICIOUS" => label.red().to_string(),
                 "MALICIOUS" => label.red().bold().to_string(),
+                "INCONCLUSIVE" => label.cyan().to_string(),
                 _ => label.to_string(),
             };
             format!("{}: {}", colored_label, count)
@@ -294,6 +392,51 @@ fn main() {
 
     // Case 5: All clean -> no prompt
     let _ = writeln!(tty, "\n  {}", "All packages look clean.".green());
+}
+
+
+/// Scan local clones for packages whose metadata could not be fetched.
+///
+/// Used only when the AUR is unreachable. The results are always `Unknown`:
+/// analysis without metadata cannot produce a verdict, and reporting
+/// `SUSPICIOUS` would slander a package nobody judged while `TRUSTED` would
+/// pass an unverified install.
+fn scan_local_clones(names: &[String]) -> Vec<ScanResult> {
+    use traur::shared::cache;
+
+    let mut out = Vec::new();
+    for name in names {
+        let dir = cache::git_cache_dir().join(name);
+        if !dir.is_dir() {
+            continue;
+        }
+        let Ok(loaded) = traur::shared::local_scan::load_dir(name, &dir) else {
+            continue;
+        };
+        let mut result = coordinator::run_analysis(&loaded.context);
+        let carried: Vec<traur::shared::scoring::Signal> = result
+            .signals
+            .iter()
+            .filter(|s| s.is_override_gate)
+            .cloned()
+            .collect();
+        let verdict = result.override_gate_fired.clone();
+        result = traur::shared::scoring::compute_score_with_status(
+            name,
+            &result.signals,
+            ScanStatus::Incomplete,
+            Some("AUR unreachable — network failure; scan incomplete".to_string()),
+        );
+        // Surface a locally-detected override gate without turning it into a tier.
+        if let Some(gate) = verdict {
+            let _ = carried;
+            result.reason = Some(format!(
+                "AUR unreachable — network failure; scan incomplete. Local analysis flagged {gate}"
+            ));
+        }
+        out.push(result);
+    }
+    out
 }
 
 /// Whether the user opted out of blocking when the AUR is unreachable.

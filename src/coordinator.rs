@@ -35,7 +35,16 @@ pub fn build_context(package_name: &str) -> Result<PackageContext, String> {
 
     let repo_path = aur_git::ensure_repo(package_base, cache_str)?;
 
-    let pkgbuild_content = aur_git::read_pkgbuild(&repo_path).ok();
+    let mut incomplete: Vec<String> = Vec::new();
+    let pkgbuild_content = match aur_git::read_pkgbuild(&repo_path) {
+        Ok(c) => Some(c),
+        Err(e) => {
+            // No PKGBUILD means nothing was analysed. This must not become a
+            // clean verdict.
+            incomplete.push(format!("PKGBUILD unreadable: {e}"));
+            None
+        }
+    };
     let install_script_content = pkgbuild_content
         .as_deref()
         .and_then(|content| aur_git::read_install_script(&repo_path, content));
@@ -82,6 +91,11 @@ pub fn build_context(package_name: &str) -> Result<PackageContext, String> {
         github_stars,
         github_not_found,
         aur_comments,
+        // Local sources are only available when scanning a directory; a clone
+        // has not downloaded them yet.
+        local_sources: Vec::new(),
+        source_path: Some(repo_path.clone()),
+        incomplete,
     })
 }
 
@@ -104,7 +118,14 @@ pub fn build_context_prefetched(
 
     let repo_path = aur_git::ensure_repo(package_base, cache_str)?;
 
-    let pkgbuild = aur_git::read_pkgbuild(&repo_path).ok();
+    let mut incomplete: Vec<String> = Vec::new();
+    let pkgbuild = match aur_git::read_pkgbuild(&repo_path) {
+        Ok(c) => Some(c),
+        Err(e) => {
+            incomplete.push(format!("PKGBUILD unreadable: {e}"));
+            None
+        }
+    };
     let install = pkgbuild
         .as_deref()
         .and_then(|content| aur_git::read_install_script(&repo_path, content));
@@ -140,6 +161,10 @@ pub fn build_context_prefetched(
         github_stars: gh_stars,
         github_not_found: gh_not_found,
         aur_comments: comments,
+        // A clone has not downloaded sources yet; absence is not "clean".
+        local_sources: Vec::new(),
+        source_path: Some(repo_path.clone()),
+        incomplete,
     })
 }
 
@@ -156,8 +181,71 @@ pub fn scan_pkgbuild(name: &str, pkgbuild_content: &str) -> ScanResult {
         github_stars: None,
         github_not_found: false,
         aur_comments: vec![],
+        local_sources: Vec::new(),
+        source_path: None,
+        incomplete: Vec::new(),
     };
     run_analysis(&ctx)
+}
+
+/// Analyse one committed `source=()` file by treating it as a script.
+///
+/// A local source is executed by makepkg at least as readily as the PKGBUILD:
+/// the build function can `source` it, or an interpreter can run it. The same
+/// engines therefore run over it, with an `LS-` prefix so reports say where the
+/// finding came from. A `.install`-shape file is not special-cased: the region
+/// scanner follows function bodies and the whole-file fallback covers the rest.
+fn analyze_local_source(source: &crate::shared::local_scan::LocalSource) -> Vec<crate::shared::scoring::Signal> {
+    use crate::shared::scoring::SignalCategory;
+
+    let mut signals = Vec::new();
+    let content = &source.content;
+
+    for pat in crate::shared::patterns::load_patterns("pkgbuild_analysis") {
+        let view = crate::shared::normalize::NormalizedView::new(content);
+        if pat.regex.is_match(view.masked()) || pat.regex.is_match(view.plain()) {
+            let mut signal = crate::shared::scoring::Signal::new(
+                &format!("LS-{}", pat.id),
+                SignalCategory::Pkgbuild,
+                pat.points,
+            )
+            .with_description(format!(
+                "{} (in local source file {})",
+                pat.description, source.name
+            ));
+            signal.is_override_gate = pat.override_gate;
+            signal.matched_line = view.first_matching_line(&pat.regex);
+            signals.push(signal);
+        }
+    }
+
+    // Composition engines treat the file as its own script. The content goes in
+    // *both* slots because a local source may be sourced directly (top-level
+    // statements, no function) or define `.install`-style hooks; the region
+    // scanner's whole-file fallback covers the first case.
+    let inner = crate::shared::models::PackageContext {
+        name: format!("local:{}", source.name),
+        install_script_content: Some(content.clone()),
+        pkgbuild_content: Some(content.clone()),
+        ..Default::default()
+    };
+    let composed: [Box<dyn crate::features::Feature>; 2] = [
+        Box::new(crate::features::eval_analysis::EvalAnalysis),
+        Box::new(crate::features::pipe_chain_analysis::PipeChainAnalysis),
+    ];
+    for feature in composed.iter() {
+        for mut sig in feature.analyze(&inner) {
+            if sig.id.starts_with("IS-") {
+                sig.id = format!("LS-{}", sig.id.trim_start_matches("IS-"));
+            } else {
+                sig.id = format!("LS-{}", sig.id);
+            }
+            sig.description = format!("{} (in local source file {})", sig.description, source.name);
+            signals.push(sig);
+        }
+    }
+
+    signals
 }
 
 /// Run all registered features against the context and compute a score.
@@ -179,9 +267,30 @@ pub fn run_analysis_with_config(
         all_signals.extend(signals);
     }
 
+    for source in &ctx.local_sources {
+        all_signals.extend(analyze_local_source(source));
+    }
+
+    // A declaration in the PKGBUILD can turn a lifecycle capability into a
+    // fact (npm listed in makedepends). Runs before scoring and can only
+    // lower roles, never raise them.
+    crate::shared::contextual_facts::apply(ctx, &mut all_signals);
+
     if !config.ignored.signals.is_empty() || !config.ignored.categories.is_empty() {
         all_signals
             .retain(|s| !crate::shared::config::is_signal_ignored(config, &s.id, &s.category));
+    }
+
+    // Missing inputs make the scan inconclusive. Enforcement lives here, at
+    // the single place every caller goes through, so no path can emit a
+    // verdict from an incompletely analysed package.
+    if !ctx.incomplete.is_empty() {
+        return scoring::compute_score_with_status(
+            &ctx.name,
+            &all_signals,
+            scoring::ScanStatus::Incomplete,
+            Some(ctx.incomplete.join("; ")),
+        );
     }
 
     scoring::compute_score(&ctx.name, &all_signals)

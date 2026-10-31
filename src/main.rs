@@ -20,9 +20,13 @@ enum Commands {
         /// Package name to scan (or --pkgbuild for local)
         package: Option<String>,
 
-        /// Scan a local PKGBUILD directory
+        /// Scan a local PKGBUILD file (the whole directory is analysed)
         #[arg(long)]
         pkgbuild: Option<String>,
+
+        /// Scan a local package directory: PKGBUILD, .install and committed sources
+        #[arg(long)]
+        dir: Option<String>,
 
         /// Scan all installed AUR packages (default when no package given)
         #[arg(long)]
@@ -102,6 +106,7 @@ fn main() {
         Commands::Scan {
             package,
             pkgbuild,
+            dir,
             all_installed,
             jobs,
             json,
@@ -111,6 +116,7 @@ fn main() {
         } => cmd_scan(
             package,
             pkgbuild,
+            dir,
             all_installed,
             jobs,
             json,
@@ -132,6 +138,7 @@ fn main() {
 fn cmd_scan(
     package: Option<String>,
     pkgbuild: Option<String>,
+    dir: Option<String>,
     _all_installed: bool,
     jobs: usize,
     json: bool,
@@ -139,26 +146,61 @@ fn cmd_scan(
     flagged_only: bool,
     notify: bool,
 ) -> i32 {
-    if let Some(path) = pkgbuild {
-        let content = match std::fs::read_to_string(&path) {
-            Ok(c) => c,
+    // `--dir` is the full-fidelity local scan: PKGBUILD, the `.install`
+    // pacman will run, and committed `source=()` files. It is what the
+    // `makepkg` wrapper uses, because a `.install` payload is invisible to a
+    // PKGBUILD-only scan.
+    if let Some(target) = dir.or_else(|| pkgbuild.clone()) {
+        let path = std::path::Path::new(&target);
+        let (root, name) = if path.is_dir() {
+            (
+                path.to_path_buf(),
+                path.file_name().and_then(|n| n.to_str()).unwrap_or("local").to_string(),
+            )
+        } else {
+            (
+                shared::local_scan::package_dir_for(path),
+                path.parent()
+                    .and_then(|p| p.file_name())
+                    .and_then(|n| n.to_str())
+                    .unwrap_or("local")
+                    .to_string(),
+            )
+        };
+        let loaded = match shared::local_scan::load_dir(&name, &root) {
+            Ok(l) => l,
             Err(e) => {
-                eprintln!("Error reading {path}: {e}");
+                eprintln!("Error reading {target}: {e}");
                 return 1;
             }
         };
-        let name = std::path::Path::new(&path)
-            .parent()
-            .and_then(|p| p.file_name())
-            .and_then(|n| n.to_str())
-            .unwrap_or("local");
-        let result = coordinator::scan_pkgbuild(name, &content);
+        let result = coordinator::run_analysis(&loaded.context);
+
+        // Anything not analysed is reported, so nobody reads a partial scan as
+        // a clean one.
+        if !json {
+            if loaded.capped {
+                eprintln!(
+                    "  note: local source limit reached; some files were not analysed"
+                );
+            }
+            for (name, reason) in &loaded.skipped_sources {
+                eprintln!("  note: {name} not analysed: {reason}");
+            }
+        }
+
         if json {
             shared::output::print_json(&result);
         } else {
             shared::output::print_text(&result, verbose);
         }
-        return if result.tier >= shared::scoring::Tier::Suspicious { 1 } else { 0 };
+        return if result.tier >= shared::scoring::Tier::Suspicious
+            || result.tier == shared::scoring::Tier::Unknown
+        {
+            1
+        } else {
+            0
+        };
     }
 
     if let Some(pkg) = package {
@@ -176,6 +218,9 @@ fn cmd_scan_single(pkg: &str, json: bool, verbose: bool) -> i32 {
             match tier {
                 Tier::Trusted | Tier::Ok | Tier::Sketchy => 0,
                 Tier::Suspicious | Tier::Malicious => 1,
+                // Inconclusive is an error, not a verdict: a script must not
+                // read it as "clean" (PLAN.md N4.4).
+                Tier::Unknown => 1,
             }
         }
         Err(e) => {
@@ -245,7 +290,7 @@ fn cmd_scan_all_installed(
             .progress_chars("##-"),
     );
 
-    let tier_counts: [AtomicU64; 5] = std::array::from_fn(|_| AtomicU64::new(0));
+    let tier_counts: [AtomicU64; 6] = std::array::from_fn(|_| AtomicU64::new(0));
     let error_count = AtomicU64::new(0);
     let flagged = std::sync::Mutex::new(Vec::<ScanResult>::new());
 
@@ -275,6 +320,7 @@ fn cmd_scan_all_installed(
                         Tier::Sketchy => 2,
                         Tier::Suspicious => 3,
                         Tier::Malicious => 4,
+                        Tier::Unknown => 5,
                     };
                     tier_counts[idx].fetch_add(1, Ordering::Relaxed);
 
@@ -307,12 +353,13 @@ fn cmd_scan_all_installed(
         println!("{}", "=== traur scan results ===".bold());
         println!("  Scanned: {} packages ({} errors)", scanned, errors);
         println!(
-            "  TRUSTED: {}  OK: {}  SKETCHY: {}  SUSPICIOUS: {}  MALICIOUS: {}",
+            "  TRUSTED: {}  OK: {}  SKETCHY: {}  SUSPICIOUS: {}  MALICIOUS: {}  INCONCLUSIVE: {}",
             tier_counts[0].load(Ordering::Relaxed),
             tier_counts[1].load(Ordering::Relaxed),
             tier_counts[2].load(Ordering::Relaxed),
             tier_counts[3].load(Ordering::Relaxed),
             tier_counts[4].load(Ordering::Relaxed),
+            tier_counts[5].load(Ordering::Relaxed),
         );
 
         if !flagged.is_empty() {
@@ -345,7 +392,22 @@ fn cmd_scan_all_installed(
         notify_flagged(suspicious, malicious);
     }
 
-    if has_critical { 1 } else { 0 }
+    let inconclusive = tier_counts[5].load(Ordering::Relaxed);
+
+    // An inconclusive scan is not "all clean": say so, so an unattended run
+    // (timer, CI) does not read silence as a pass.
+    if inconclusive > 0 && !json {
+        println!();
+        println!(
+            "{}",
+            format!(
+                "  {inconclusive} package(s) could not be scanned (missing inputs; not a verdict)."
+            )
+            .cyan()
+        );
+    }
+
+    if has_critical || inconclusive > 0 { 1 } else { 0 }
 }
 
 /// Show a desktop notification when a scan finds critical packages.

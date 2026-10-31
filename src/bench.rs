@@ -19,7 +19,7 @@ struct BenchStats {
     total: usize,
     scanned: usize,
     errors: usize,
-    tier_counts: [usize; 5],
+    tier_counts: [usize; 6],
     total_time: Duration,
     prefetch_time: Duration,
     clone_time_us: u64,
@@ -100,7 +100,7 @@ pub fn run(count: usize, jobs: usize) -> i32 {
     let scan_start = Instant::now();
 
     let error_count = AtomicU64::new(0);
-    let tier_counts: [AtomicU64; 5] = std::array::from_fn(|_| AtomicU64::new(0));
+    let tier_counts: [AtomicU64; 6] = std::array::from_fn(|_| AtomicU64::new(0));
     let clone_time_us = AtomicU64::new(0);
     let analysis_time_us = AtomicU64::new(0);
     let error_samples = std::sync::Mutex::new(Vec::<(String, String)>::new());
@@ -199,6 +199,7 @@ fn tier_to_index(tier: Tier) -> usize {
         Tier::Sketchy => 2,
         Tier::Suspicious => 3,
         Tier::Malicious => 4,
+        Tier::Unknown => 5,
     }
 }
 
@@ -264,6 +265,7 @@ fn print_report(stats: &BenchStats) {
     println!("    SKETCHY:    {:>5}  ({:.1}%)", stats.tier_counts[2], pct(stats.tier_counts[2]));
     println!("    SUSPICIOUS: {:>5}  ({:.1}%)", stats.tier_counts[3], pct(stats.tier_counts[3]));
     println!("    MALICIOUS:  {:>5}  ({:.1}%)", stats.tier_counts[4], pct(stats.tier_counts[4]));
+    println!("    INCONCLUSIVE: {:>3}  ({:.1}%)", stats.tier_counts[5], pct(stats.tier_counts[5]));
 
     if !stats.error_samples.is_empty() {
         println!();

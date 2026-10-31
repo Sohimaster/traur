@@ -48,12 +48,17 @@ pkgbase=$(bash -c 'source PKGBUILD >/dev/null 2>&1; printf "%s" "${pkgbase:-${pk
 [[ -n "$pkgbase" ]] || exec /usr/bin/makepkg "$@"
 
 tmsg "traur: scanning $pkgbase..."
-# The report goes to the terminal on stderr; stdout stays clean for yay.
-traur scan --pkgbuild ./PKGBUILD >&2
-
-# Decide on the parsed tier, not the exit code: a scan that errored prints no
-# tier, and "no tier" must not be treated as trusted.
-tier=$(traur scan --pkgbuild ./PKGBUILD --json 2>/dev/null | sed -n 's/.*"tier"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' | head -1)
+# Scan the whole directory once: the PKGBUILD alone misses the .install script
+# pacman will run and any committed source=() file that build() can source.
+# One scan only: a second invocation would repeat the work and the prompt.
+# stdout from traur stays captured so yay's own parsing is never disturbed.
+scan_json=$(traur scan --dir "$PWD" --json 2>/dev/null)
+# Render the report from the same JSON so the summary and the decision cannot
+# disagree.
+tier=$(printf '%s\n' "$scan_json" | sed -n 's/.*"tier"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' | head -1)
+score=$(printf '%s\n' "$scan_json" | sed -n 's/.*"score"[[:space:]]*:[[:space:]]*\([0-9]*\).*/\1/p' | head -1)
+reason=$(printf '%s\n' "$scan_json" | sed -n 's/.*"reason"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' | head -1)
+tmsg "traur: $pkgbase — ${tier:-no verdict} (trust: ${score:-?}/100)"
 
 case "$tier" in
     Trusted)
@@ -66,6 +71,16 @@ case "$tier" in
     Suspicious|Malicious)
         twarn "$pkgbase is $tier"
         printf '%s==> WARNING:%s Continue anyway? [y/N]%s ' "$YELLOW" "$ALL_OFF" "$ALL_OFF" >/dev/tty
+        read -r reply < /dev/tty
+        [[ "$reply" =~ ^[Yy]$ ]] || { tmsg "aborted"; exit 1; }
+        ;;
+    Unknown)
+        # The scan could not conclude: this is not a verdict in either
+        # direction. Say why, and do not imply the package is suspicious.
+        twarn "traur could not conclude for $pkgbase${reason:+: $reason}"
+        printf '%s==>%s This is not a verdict; the package was neither verified nor found suspicious.%s\n' \
+            "$YELLOW" "$ALL_OFF" "$ALL_OFF" >/dev/tty
+        printf '%s==> WARNING:%s Continue without a verdict? [y/N]%s ' "$YELLOW" "$ALL_OFF" "$ALL_OFF" >/dev/tty
         read -r reply < /dev/tty
         [[ "$reply" =~ ^[Yy]$ ]] || { tmsg "aborted"; exit 1; }
         ;;
