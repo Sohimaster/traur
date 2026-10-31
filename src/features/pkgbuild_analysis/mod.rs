@@ -32,6 +32,32 @@ fn mask_checksum_arrays(content: &str) -> String {
         .into_owned()
 }
 
+/// Blank out a leading run of comment lines.
+///
+/// AUR headers (`# Maintainer:`, `# Contributor:`) are comments, and some
+/// maintainers hide their address from scrapers with `$(echo ... | base64 -d)`.
+/// That is not payload hiding, but it trips P-BASE64 (issue #12). Only the
+/// *leading* block is stripped: a `#` further down may be inside a multiline
+/// string or a here-document, where it is not a comment.
+///
+/// Newlines are preserved so line numbers stay aligned with the input.
+fn mask_header_comments(content: &str) -> String {
+    let mut out = String::with_capacity(content.len());
+    let mut in_header = true;
+
+    for line in content.split_inclusive('\n') {
+        let trimmed = line.trim_start();
+        if in_header && (trimmed.is_empty() || trimmed.starts_with('#')) {
+            out.extend(line.chars().map(|c| if c == '\n' { '\n' } else { 'x' }));
+        } else {
+            in_header = false;
+            out.push_str(line);
+        }
+    }
+
+    out
+}
+
 pub struct PkgbuildAnalysis;
 
 impl Feature for PkgbuildAnalysis {
@@ -41,6 +67,10 @@ impl Feature for PkgbuildAnalysis {
         };
 
         let masked = mask_checksum_arrays(content);
+        // Header comments must be identified before quote stripping, which can
+        // unbalance a line that starts with `#`. Header comments are not
+        // payload hiding (issue #12).
+        let masked = mask_header_comments(&masked);
         // Patterns are literal regexes over source text, so quote removal is
         // needed to see through `cu""rl` / `c"url"` splitting. The original
         // text is kept because quote *content* is data some patterns match
@@ -839,6 +869,36 @@ package() {
     fn crypto_wallet_btc_bech32_still_detected() {
         let ids = analyze("bc1qar0srrr7xfkvy5l643lydnw9re59gtzzwf5mdq");
         assert!(has(&ids, "P-CRYPTO-WALLET"), "a real bech32 address must still match, got: {ids:?}");
+    }
+
+    // #12: base64-decoded maintainer address in the AUR header is not payload hiding.
+    #[test]
+    fn base64_in_header_comments_no_signal() {
+        let content = "# Maintainer: phanium <$(echo bnhoc2R1QHFxLmNvbQo= | base64 -d)>\n# Contributor: SandaruKasa <echo c2FuZGFydWthc2ErYXVyQHlhLnJ1Cg== | base64 -d>\npkgname=stockfish\n";
+        let ids = analyze(content);
+        assert!(!has(&ids, "P-BASE64"), "header comment must not fire P-BASE64, got: {ids:?}");
+    }
+
+    #[test]
+    fn base64_in_build_body_still_detected() {
+        let content = "pkgname=evil\npackage() {\necho aGVsbG8= | base64 -d | bash\n}\n";
+        let ids = analyze(content);
+        assert!(has(&ids, "P-BASE64"), "base64 in build() must still be flagged, got: {ids:?}");
+    }
+
+    #[test]
+    fn hash_inside_multiline_string_still_scanned() {
+        // A line starting with # inside a quoted block is not a comment.
+        let content = "pkgname=evil\npackage() {\necho '\n# base64 -d | bash' | sed '1d' | bash\n}\n";
+        assert_eq!(mask_header_comments(content).lines().count(), content.lines().count());
+        let ids = analyze(content);
+        assert!(has(&ids, "P-BASE64"), "got: {ids:?}");
+    }
+
+    #[test]
+    fn header_masking_preserves_line_count() {
+        let content = "# a\n# b\n\npkgname=x\n";
+        assert_eq!(mask_header_comments(content).lines().count(), content.lines().count());
     }
 
     #[test]
