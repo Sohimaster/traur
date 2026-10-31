@@ -1,0 +1,112 @@
+name: Release
+
+# Builds the release artifacts on GitHub's infrastructure and attaches them to
+# the tag's release, so the `traur-bin` package is not built on a maintainer's
+# laptop. See issue #10.
+#
+# The tarball layout matches `.claude/skills/release/SKILL.md`: a flat archive
+# with exactly traur, traur-hook, traur.hook, patterns.toml and LICENSE.
+
+on:
+  push:
+    tags:
+      - "v*"
+  # Allows rebuilding an existing release's artifacts from the Actions tab.
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Tag to build (e.g. v0.5.0)"
+        required: true
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: Build and attach release artifacts
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.tag || github.ref }}
+          fetch-depth: 0
+
+      - name: Install Rust toolchain
+        run: |
+          rustup toolchain install stable --profile minimal
+          rustup default stable
+          rustc --version
+          cargo --version
+
+      - name: Cache cargo registry and build
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+
+      - name: Build
+        run: cargo build --release --locked
+
+      - name: Test
+        run: cargo test --locked
+
+      - name: Assemble release tarball
+        id: package
+        run: |
+          set -euo pipefail
+          version="${GITHUB_REF_NAME:-${{ github.event.inputs.tag }}}"
+          version="${version#v}"
+          archive="traur-${version}-x86_64.tar.gz"
+
+          tar czf "$archive" \
+            -C "$(pwd)/target/release" traur traur-hook \
+            -C "$(pwd)/hook" traur.hook \
+            -C "$(pwd)/data" patterns.toml \
+            -C "$(pwd)" LICENSE
+
+          # The AUR -bin package expects exactly these five flat entries.
+          expected="LICENSE
+          patterns.toml
+          traur
+          traur-hook
+          traur.hook"
+          actual="$(tar tzf "$archive" | sort)"
+          if [ "$(echo "$actual" | tr -d '[:space:]')" != "$(echo "$expected" | tr -d '[:space:]')" ]; then
+            echo "unexpected tarball contents:" >&2
+            echo "$actual" >&2
+            exit 1
+          fi
+
+          sha256sum "$archive" | tee "$archive.sha256"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "archive=$archive" >> "$GITHUB_OUTPUT"
+
+      - name: Attach artifacts to the release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          tag="${{ github.event.inputs.tag || github.ref_name }}"
+          archive="${{ steps.package.outputs.archive }}"
+
+          if gh release view "$tag" >/dev/null 2>&1; then
+            gh release upload "$tag" "$archive" "$archive.sha256" --clobber
+          else
+            gh release create "$tag" "$archive" "$archive.sha256" \
+              --title "$tag" \
+              --notes "Release $tag"
+          fi
+
+      - name: Summarise
+        run: |
+          {
+            echo "### Release artifacts"
+            echo
+            echo "| file | sha256 |"
+            echo "|---|---|"
+            echo "| \`${{ steps.package.outputs.archive }}\` | \`$(cut -d' ' -f1 "${{ steps.package.outputs.archive }}.sha256")\` |"
+            echo
+            echo "Built on \`ubuntu-24.04\` from tag \`${{ github.event.inputs.tag || github.ref_name }}\`."
+          } >> "$GITHUB_STEP_SUMMARY"
