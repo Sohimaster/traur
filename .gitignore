@@ -2,3 +2,9 @@
 .idea/
 *.log
 pkg/*.tar.gz
+
+# makepkg build output
+pkg/pkg/
+pkg/src/
+pkg/*.pkg.tar.zst
+pkg/*.tar.gz

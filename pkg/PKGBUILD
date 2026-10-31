@@ -7,7 +7,7 @@ arch=('x86_64')
 url='https://github.com/Sohimaster/traur'
 license=('MIT')
 depends=('git' 'pacman' 'gcc-libs' 'glibc')
-makedepends=('cargo')
+makedepends=('cargo' 'rust')
 source=("$pkgname-$pkgver.tar.gz::$url/archive/v$pkgver.tar.gz")
 sha256sums=('d1c206778c7b609ead78d2af6061ada99244cef42e6052c6e2ebeb0e00952922')
 
@@ -22,6 +22,9 @@ build() {
     export RUSTUP_TOOLCHAIN=stable
     export CARGO_TARGET_DIR=target
     cargo build --frozen --release
+    # cargo should already mark these executable; be explicit so a tarball or
+    # odd umask cannot produce non-runnable binaries (issue #3).
+    chmod +x target/release/traur target/release/traur-hook
 }
 
 check() {
