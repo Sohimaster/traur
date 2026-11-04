@@ -16,6 +16,7 @@ pub fn fetch_recent_comments(pkgbase: &str) -> Vec<String> {
 
     let resp = match reqwest::blocking::Client::new()
         .get(&url)
+        .header("User-Agent", "traur")
         .timeout(std::time::Duration::from_secs(10))
         .send()
     {
