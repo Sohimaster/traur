@@ -634,7 +634,7 @@ override_gate = true
 
 [[install_script_analysis]]
 id = "P-INSTALL-PERSISTENCE"
-pattern = 'systemctl\s+enable|crontab|/etc/cron\.d/'
+pattern = '(?m)(?:^|[;{&|])\s*(?:sudo\s+)?systemctl\s+enable|crontab|/etc/cron\.d/'
 points = 45
 description = "Persistence mechanism in install script"
 override_gate = false
@@ -1767,7 +1767,7 @@ override_gate = true
 
 [[pkgbuild_analysis]]
 id = "P-EBPF-ROOTKIT"
-pattern = '(#include\s*<bpf/libbpf\.h>|\bbpf\s*\(\s*BPF_|\bBPF_(PROG_LOAD|MAP_CREATE)\b|perf_event_open\b|\bkprobe\b|\buprobe\b|\btracepoint\b.*\bBPF\b|\bbc_attach_kprobe\b|\blibbpf\b|\bbpftool\b|\bbpftrace\b)'
+pattern = '(#include\s*<bpf/libbpf\.h>|\bbpf\s*\(\s*BPF_|\bBPF_(PROG_LOAD|MAP_CREATE)\b|perf_event_open\b|\bkprobe\b|\buprobe\b|\btracepoint\b.*\bBPF\b|\bbc_attach_kprobe\b|\bbpftool\s+prog\s+load(?:all)?\b|\bbpftrace\s+-e\b)'
 points = 85
 description = "eBPF program loading (kernel-level rootkit / process hiding)"
 override_gate = false
@@ -1795,7 +1795,7 @@ override_gate = false
 
 [[install_script_analysis]]
 id = "P-INSTALL-EBPF-ROOTKIT"
-pattern = '(#include\s*<bpf/libbpf\.h>|\bbpf\s*\(\s*BPF_|\bBPF_(PROG_LOAD|MAP_CREATE)\b|\bkprobe\b|\buprobe\b|\bbc_attach_kprobe\b|\blibbpf\b|\bbpftool\b|\bbpftrace\b)'
+pattern = '(#include\s*<bpf/libbpf\.h>|\bbpf\s*\(\s*BPF_|\bBPF_(PROG_LOAD|MAP_CREATE)\b|\bkprobe\b|\buprobe\b|\bbc_attach_kprobe\b|\bbpftool\s+prog\s+load(?:all)?\b|\bbpftrace\s+-e\b)'
 points = 90
 description = "eBPF program loading in an install script (kernel-level rootkit)"
 override_gate = false

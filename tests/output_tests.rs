@@ -42,6 +42,7 @@ fn render(result: &ScanResult, verbose: bool) -> String {
 #[test]
 fn trusted_no_signals() {
     let result = ScanResult {
+        provenance: Default::default(),
         package: "yay".to_string(),
         score: 100,
         tier: Tier::Trusted,
@@ -62,6 +63,7 @@ traur: yay (trust: 100/100)
 #[test]
 fn trusted_with_signals() {
     let result = ScanResult {
+        provenance: Default::default(),
         package: "eww".to_string(),
         score: 92,
         tier: Tier::Trusted,
@@ -89,6 +91,7 @@ traur: eww (trust: 92/100)
 #[test]
 fn ok_with_signals() {
     let result = ScanResult {
+        provenance: Default::default(),
         package: "some-tool".to_string(),
         score: 70,
         tier: Tier::Ok,
@@ -116,6 +119,7 @@ traur: some-tool (trust: 70/100)
 #[test]
 fn sketchy_with_signals() {
     let result = ScanResult {
+        provenance: Default::default(),
         package: "sketchy-pkg".to_string(),
         score: 50,
         tier: Tier::Sketchy,
@@ -143,6 +147,7 @@ traur: sketchy-pkg (trust: 50/100)
 #[test]
 fn suspicious_with_signals() {
     let result = ScanResult {
+        provenance: Default::default(),
         package: "shady-bin".to_string(),
         score: 30,
         tier: Tier::Suspicious,
@@ -172,6 +177,7 @@ traur: shady-bin (trust: 30/100)
 #[test]
 fn malicious_with_override_gate() {
     let result = ScanResult {
+        provenance: Default::default(),
         package: "evil-tool".to_string(),
         score: 5,
         tier: Tier::Malicious,
@@ -198,6 +204,7 @@ traur: evil-tool (trust: 5/100)
 #[test]
 fn malicious_no_signals_only_gate() {
     let result = ScanResult {
+        provenance: Default::default(),
         package: "backdoor".to_string(),
         score: 10,
         tier: Tier::Malicious,
@@ -224,6 +231,7 @@ traur: backdoor (trust: 10/100)
 #[test]
 fn verbose_shows_matched_lines() {
     let result = ScanResult {
+        provenance: Default::default(),
         package: "test-pkg".to_string(),
         score: 45,
         tier: Tier::Sketchy,
@@ -254,6 +262,7 @@ traur: test-pkg (trust: 45/100)
 #[test]
 fn verbose_without_matched_line_shows_nothing_extra() {
     let result = ScanResult {
+        provenance: Default::default(),
         package: "test-pkg".to_string(),
         score: 85,
         tier: Tier::Trusted,
@@ -276,6 +285,7 @@ fn verbose_without_matched_line_shows_nothing_extra() {
 #[test]
 fn signal_prefix_levels() {
     let result = ScanResult {
+        provenance: Default::default(),
         package: "prefix-test".to_string(),
         score: 20,
         tier: Tier::Malicious,

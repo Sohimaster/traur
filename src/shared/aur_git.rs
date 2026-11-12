@@ -3,6 +3,16 @@ use std::path::PathBuf;
 use std::process::{Command, Output, Stdio};
 use std::time::{Duration, Instant};
 
+static FETCH_GATE: std::sync::Mutex<Option<Instant>> = std::sync::Mutex::new(None);
+
+fn pace_fetch() {
+    let mut last = FETCH_GATE.lock().unwrap_or_else(|e| e.into_inner());
+    if let Some(previous) = *last {
+        std::thread::sleep(Duration::from_secs(1).saturating_sub(previous.elapsed()));
+    }
+    *last = Some(Instant::now());
+}
+
 const AUR_GIT_BASE: &str = "https://aur.archlinux.org";
 const GIT_TIMEOUT: Duration = Duration::from_secs(30);
 
@@ -17,6 +27,7 @@ pub fn ensure_repo(package_base: &str, cache_dir: &str) -> Result<PathBuf, Strin
         return Err(format!("invalid package name: {package_base}"));
     }
 
+    pace_fetch();
     let repo_path = PathBuf::from(cache_dir).join(package_base);
 
     if repo_path.join(".git").exists() {

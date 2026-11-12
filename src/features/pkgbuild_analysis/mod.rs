@@ -80,7 +80,12 @@ impl Feature for PkgbuildAnalysis {
         let mut signals = Vec::new();
 
         for pat in compiled {
-            let hit = pat.regex.is_match(&masked) || pat.regex.is_match(&normalized);
+            let hit = if pat.id == "P-SYSTEMD-USER" {
+                let view = crate::shared::normalize::NormalizedView::new(content);
+                pat.regex.is_match(view.masked()) || pat.regex.is_match(view.plain())
+            } else {
+                pat.regex.is_match(&masked) || pat.regex.is_match(&normalized)
+            };
             if hit {
                 let matched_line = content
                     .lines()

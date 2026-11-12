@@ -129,3 +129,13 @@ Categories: download-and-execute, reverse shells, credential theft, persistence 
 ## License
 
 MIT
+
+JSON scan provenance includes `installed_version` from pacman, `scanned_version`
+from the checked-out `.SRCINFO`, and `scanned_commit` from its Git HEAD when
+available (otherwise null). These identify recipe metadata, not installed binary
+contents. `scanned_recipe_sha256` hashes the exact PKGBUILD and install script
+strings read by the scanner, in that order: each absent input contributes a zero
+byte; each present input contributes a one byte, its UTF-8 byte length as an
+unsigned 64-bit big-endian integer, and its UTF-8 bytes. Downloaded sources and
+built package contents are outside this digest, so equality does not prove an
+installed package is safe or matches a build.

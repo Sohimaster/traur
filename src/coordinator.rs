@@ -284,14 +284,42 @@ pub fn run_analysis_with_config(
     // Missing inputs make the scan inconclusive. Enforcement lives here, at
     // the single place every caller goes through, so no path can emit a
     // verdict from an incompletely analysed package.
-    if !ctx.incomplete.is_empty() {
-        return scoring::compute_score_with_status(
+    let mut result = if !ctx.incomplete.is_empty() {
+        scoring::compute_score_with_status(
             &ctx.name,
             &all_signals,
             scoring::ScanStatus::Incomplete,
             Some(ctx.incomplete.join("; ")),
-        );
+        )
+    } else {
+        scoring::compute_score(&ctx.name, &all_signals)
+    };
+    use sha2::{Digest, Sha256};
+    let mut digest = Sha256::new();
+    for content in [&ctx.pkgbuild_content, &ctx.install_script_content] {
+        match content {
+            Some(text) => { digest.update([1]); digest.update((text.len() as u64).to_be_bytes()); digest.update(text.as_bytes()); }
+            None => digest.update([0]),
+        }
     }
-
-    scoring::compute_score(&ctx.name, &all_signals)
+    result.provenance.insert("scanned_recipe_sha256".into(), serde_json::json!(format!("{:x}", digest.finalize())));
+    let installed = std::process::Command::new("pacman").args(["-Q", &ctx.name]).output().ok()
+        .filter(|o| o.status.success()).and_then(|o| String::from_utf8(o.stdout).ok())
+        .and_then(|s| s.split_whitespace().nth(1).map(str::to_owned));
+    result.provenance.insert("installed_version".into(), serde_json::json!(installed));
+    let mut commit = None;
+    let mut version = None;
+    if let Some(path) = &ctx.source_path {
+        commit = std::process::Command::new("git").args(["rev-parse", "HEAD"]).current_dir(path).output().ok()
+            .filter(|o| o.status.success()).and_then(|o| String::from_utf8(o.stdout).ok()).map(|s| s.trim().to_owned());
+        if let Ok(info) = std::fs::read_to_string(path.join(".SRCINFO")) {
+            let field = |key: &str| info.lines().filter_map(|l| l.trim().split_once(" = ")).find(|(k,_)| *k == key).map(|(_,v)| v.to_owned());
+            if let (Some(v), Some(r)) = (field("pkgver"), field("pkgrel")) {
+                version = Some(format!("{}{}-{}", field("epoch").filter(|e| e != "0").map(|e| format!("{e}:")).unwrap_or_default(), v, r));
+            }
+        }
+    }
+    result.provenance.insert("scanned_version".into(), serde_json::json!(version));
+    result.provenance.insert("scanned_commit".into(), serde_json::json!(commit));
+    result
 }

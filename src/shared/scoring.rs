@@ -164,6 +164,8 @@ pub enum ScanStatus {
 /// Complete result of scanning a package.
 #[derive(Debug, Serialize)]
 pub struct ScanResult {
+    #[serde(flatten)]
+    pub provenance: std::collections::BTreeMap<String, serde_json::Value>,
     pub package: String,
     pub score: u32,
     pub tier: Tier,
@@ -199,6 +201,7 @@ pub fn compute_score_with_status(
 ) -> ScanResult {
     if status == ScanStatus::Incomplete {
         return ScanResult {
+            provenance: Default::default(),
             package: package_name.to_string(),
             // Deliberately 0: an inconclusive scan has no trust value, and a
             // number here would invite sorting or thresholding it.
@@ -225,6 +228,7 @@ pub fn compute_score_with_status(
         // Use the higher of the override gate score and the weighted score
         let risk = signal.points.max(weighted_score).min(100);
         return ScanResult {
+            provenance: Default::default(),
             package: package_name.to_string(),
             score: 100 - risk,
             tier: Tier::Malicious,
@@ -240,7 +244,8 @@ pub fn compute_score_with_status(
     let tier = score_to_tier(trust);
 
     ScanResult {
-        package: package_name.to_string(),
+        provenance: Default::default(),
+            package: package_name.to_string(),
         score: trust,
         tier,
         signals: signals.to_vec(),

@@ -237,7 +237,7 @@ fn cmd_scan_all_installed(
     flagged_only: bool,
     notify: bool,
 ) -> i32 {
-    use crate::shared::bulk::{batch_fetch_metadata, clone_with_retry, prefetch_maintainer_packages};
+    use crate::shared::bulk::{batch_fetch_metadata_with_errors, clone_with_retry, prefetch_maintainer_packages};
     use crate::shared::scoring::{ScanResult, Tier};
     use colored::Colorize;
     use indicatif::{ProgressBar, ProgressStyle};
@@ -257,7 +257,12 @@ fn cmd_scan_all_installed(
     };
 
     eprintln!("  Fetching package metadata for {} installed packages...", names.len());
-    let metadata = batch_fetch_metadata(&names);
+    let (metadata, failures) = batch_fetch_metadata_with_errors(&names);
+    if failures > 0 || metadata.is_empty() {
+        eprintln!("Scan inconclusive: AUR metadata unavailable or no installed packages found on AUR.");
+        if json { println!("[]"); }
+        return 1;
+    }
     let not_found: Vec<&str> = names
         .iter()
         .filter(|n| !metadata.contains_key(n.as_str()))

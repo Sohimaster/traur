@@ -1,7 +1,7 @@
 use crate::coordinator;
 use crate::shared::aur_rpc;
 use crate::shared::models::{AurPackage, PackageContext};
-use rayon::prelude::*;
+
 use std::collections::{HashMap, HashSet};
 use std::time::Duration;
 
@@ -63,8 +63,9 @@ pub fn prefetch_maintainer_packages(
     );
 
     maintainers
-        .par_iter()
+        .iter()
         .filter_map(|m| {
+            std::thread::sleep(Duration::from_secs(1));
             aur_rpc::fetch_maintainer_packages(m)
                 .ok()
                 .map(|pkgs| (m.to_string(), pkgs))
