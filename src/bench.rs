@@ -31,7 +31,10 @@ struct BenchStats {
 fn fetch_recent_packages(count: usize) -> Result<Vec<MetaDumpPackage>, String> {
     eprintln!("  Fetching AUR package metadata dump...");
 
-    let response = reqwest::blocking::get(META_DUMP_URL)
+    let response = reqwest::blocking::Client::new()
+        .get(META_DUMP_URL)
+        .header("User-Agent", "traur")
+        .send()
         .map_err(|e| format!("Failed to fetch metadata dump: {e}"))?;
 
     let decoder = flate2::read::GzDecoder::new(response);

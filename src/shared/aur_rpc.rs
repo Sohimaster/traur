@@ -13,7 +13,10 @@ struct RpcResponse {
 /// Fetch info for a single package from the AUR RPC API.
 pub fn fetch_package_info(package_name: &str) -> Result<AurPackage, String> {
     let url = format!("{AUR_RPC_BASE}/info?arg[]={package_name}");
-    let resp: RpcResponse = reqwest::blocking::get(&url)
+    let resp: RpcResponse = reqwest::blocking::Client::new()
+        .get(&url)
+        .header("User-Agent", "traur")
+        .send()
         .map_err(|e| format!("HTTP request failed: {e}"))?
         .json()
         .map_err(|e| format!("Failed to parse AUR response: {e}"))?;
@@ -32,7 +35,10 @@ pub fn fetch_package_info(package_name: &str) -> Result<AurPackage, String> {
 pub fn fetch_packages_info(names: &[&str]) -> Result<Vec<AurPackage>, String> {
     let args: String = names.iter().map(|n| format!("arg[]={n}")).collect::<Vec<_>>().join("&");
     let url = format!("{AUR_RPC_BASE}/info?{args}");
-    let resp: RpcResponse = reqwest::blocking::get(&url)
+    let resp: RpcResponse = reqwest::blocking::Client::new()
+        .get(&url)
+        .header("User-Agent", "traur")
+        .send()
         .map_err(|e| format!("HTTP request failed: {e}"))?
         .json()
         .map_err(|e| format!("Failed to parse AUR response: {e}"))?;
@@ -43,7 +49,10 @@ pub fn fetch_packages_info(names: &[&str]) -> Result<Vec<AurPackage>, String> {
 /// Fetch all packages maintained by a given user.
 pub fn fetch_maintainer_packages(maintainer: &str) -> Result<Vec<AurPackage>, String> {
     let url = format!("{AUR_RPC_BASE}/search/{maintainer}?by=maintainer");
-    let resp: RpcResponse = reqwest::blocking::get(&url)
+    let resp: RpcResponse = reqwest::blocking::Client::new()
+        .get(&url)
+        .header("User-Agent", "traur")
+        .send()
         .map_err(|e| format!("HTTP request failed: {e}"))?
         .json()
         .map_err(|e| format!("Failed to parse AUR response: {e}"))?;
