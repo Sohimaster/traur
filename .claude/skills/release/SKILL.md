@@ -64,12 +64,13 @@ Create a flat tarball (no directory prefix) with all release artifacts:
 ```bash
 tar czf traur-$ARGUMENTS-x86_64.tar.gz \
   -C target/release traur traur-hook \
-  -C ../../hook traur.hook traur-scan.service traur-scan.timer makepkg-wrapper.sh \
+  -C ../../hook traur.hook traur-configure.hook configure-pacman-hook.sh \
+    traur-scan.service traur-scan.timer makepkg-wrapper.sh \
   -C ../data patterns.toml \
   -C .. LICENSE
 ```
 
-Verify contents — must list exactly: `traur`, `traur-hook`, `traur.hook`, `traur-scan.service`, `traur-scan.timer`, `makepkg-wrapper.sh`, `patterns.toml`, `LICENSE`
+Verify the contents against the expected file list in `.github/workflows/release.yml`.
 
 ```bash
 tar tzf traur-$ARGUMENTS-x86_64.tar.gz
@@ -79,7 +80,8 @@ If the contents are wrong, delete the tarball and recreate it using absolute pat
 ```bash
 tar czf traur-$ARGUMENTS-x86_64.tar.gz \
   -C "$(pwd)/target/release" traur traur-hook \
-  -C "$(pwd)/hook" traur.hook \
+  -C "$(pwd)/hook" traur.hook traur-configure.hook configure-pacman-hook.sh \
+    traur-scan.service traur-scan.timer makepkg-wrapper.sh \
   -C "$(pwd)/data" patterns.toml \
   -C "$(pwd)" LICENSE
 ```
