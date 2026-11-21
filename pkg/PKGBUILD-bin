@@ -10,7 +10,7 @@ depends=('git' 'pacman' 'gcc-libs' 'glibc' 'libssl.so=3-64' 'libcrypto.so=3-64')
 provides=('traur')
 conflicts=('traur')
 source=("$url/releases/download/v$pkgver/traur-$pkgver-x86_64.tar.gz")
-sha256sums=('121530553137a0de15ffeba72b172bc56c1e84182b19feb9bec84af8cd7b3eaa')
+sha256sums=('4191781b37b20d546d9d3b54364573e923b61c5c47f65194bb571bafd83c3799')
 
 package() {
     # The release tarball should preserve the exec bit; set it explicitly so a
