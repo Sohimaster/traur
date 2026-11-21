@@ -37,10 +37,9 @@ Releases are built by CI, not on a developer machine. The workflow is
 2. Commit and push to `main`.
 3. Create and push a tag: `git tag vX.Y.Z && git push origin vX.Y.Z`.
 4. The `Release` workflow builds `traur` and `traur-hook` on `ubuntu-24.04`,
-   runs `cargo test`, assembles `traur-X.Y.Z-x86_64.tar.gz` with exactly five
-   flat entries (`traur`, `traur-hook`, `traur.hook`, `traur-scan.service`,
-   `traur-scan.timer`, `patterns.toml`, `LICENSE`), publishes it together with a `.sha256` file, and records the
-   hash in the workflow run summary.
+   runs `cargo test`, assembles `traur-X.Y.Z-x86_64.tar.gz` with the flat file
+   layout checked by the workflow and consumed by `pkg/PKGBUILD-bin`, publishes
+   it with a `.sha256` file, and records the hash in the workflow run summary.
 
 ### Verifying a release
 

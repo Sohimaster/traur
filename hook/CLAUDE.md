@@ -5,6 +5,7 @@ ALPM (pacman) hook integration for automatic pre-install scanning.
 ## Files
 
 - `traur.hook` — ALPM hook definition, installed to `/usr/share/libalpm/hooks/`
+- `traur-configure.hook` — after installing or upgrading pacman or either traur package, runs `configure-pacman-hook.sh` to enable `NetworkAccess = allowed` in the shipped hook when libalpm supports it
 - `traur-hook.rs` — Hook binary entry point, compiled as a separate binary
 
 ## How it works
@@ -29,6 +30,7 @@ sudo install -Dm644 hook/traur.hook /usr/share/libalpm/hooks/traur.hook
 ```
 
 The hook binary is installed as `/usr/bin/traur-hook` by the package.
+For a manual install, run `sudo bash hook/configure-pacman-hook.sh` after copying the hook.
 
 ## Design decisions
 

@@ -2,10 +2,7 @@ name: Release
 
 # Builds the release artifacts on GitHub's infrastructure and attaches them to
 # the tag's release, so the `traur-bin` package is not built on a maintainer's
-# laptop. See issue #10.
-#
-# The tarball layout matches `.claude/skills/release/SKILL.md`: a flat archive
-# with exactly traur, traur-hook, traur.hook, patterns.toml and LICENSE.
+# laptop. See issue #10. The tarball contains the files used by pkg/PKGBUILD-bin.
 
 on:
   push:
@@ -64,13 +61,14 @@ jobs:
           tar czf "$archive" \
             -C "$(pwd)/target/release" traur traur-hook \
             -C "$(pwd)/hook" traur.hook traur-scan.service traur-scan.timer makepkg-wrapper.sh \
+              traur-configure.hook configure-pacman-hook.sh \
             -C "$(pwd)/data" patterns.toml \
             -C "$(pwd)" LICENSE
 
           # The AUR -bin package expects exactly these flat entries.
           printf '%s\n' \
-            LICENSE makepkg-wrapper.sh patterns.toml traur traur-hook \
-            traur-scan.service traur-scan.timer traur.hook \
+            LICENSE configure-pacman-hook.sh makepkg-wrapper.sh patterns.toml traur \
+            traur-configure.hook traur-hook traur-scan.service traur-scan.timer traur.hook \
             | sort > /tmp/expected.txt
           tar tzf "$archive" | sort > /tmp/actual.txt
           if ! diff -u /tmp/expected.txt /tmp/actual.txt; then

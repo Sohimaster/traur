@@ -11,3 +11,4 @@ Exec = /usr/bin/traur-hook
 Depends = traur
 NeedsTargets
 AbortOnFail
+# NetworkAccess = allowed

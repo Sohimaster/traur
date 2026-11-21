@@ -1,0 +1,12 @@
+[Trigger]
+Operation = Install
+Operation = Upgrade
+Type = Package
+Target = pacman
+Target = traur
+Target = traur-bin
+
+[Action]
+Description = Configuring the traur hook for this version of pacman...
+When = PostTransaction
+Exec = /usr/bin/bash /usr/share/traur/configure-pacman-hook.sh
